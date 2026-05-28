@@ -1,0 +1,37 @@
+{
+  "name": "@kuaimai/cli",
+  "version": "0.1.0",
+  "description": "快麦 erp-items-core 商品 CLI（对标飞书 lark-cli 分发模式）",
+  "bin": {
+    "kuaimai-cli": "scripts/run.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kuaimai/kuaimai-cli.git"
+  },
+  "license": "MIT",
+  "files": [
+    "scripts/install.js",
+    "scripts/install-wizard.js",
+    "scripts/run.js",
+    "checksums.txt"
+  ],
+  "dependencies": {
+    "@clack/prompts": "^1.2.0"
+  }
+}

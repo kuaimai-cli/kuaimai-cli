@@ -1,0 +1,2 @@
+# Placeholder — replaced by CI from GitHub Release checksums.txt on publish.
+# Local dev: install.js skips verification when entry is missing.

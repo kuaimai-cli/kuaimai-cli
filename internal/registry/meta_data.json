@@ -1,0 +1,17 @@
+{
+  "version": "1.2.0",
+  "generated_at": "2026-05-26",
+  "services": [
+    {
+      "name": "item",
+      "description": "商品（erp-items-core）",
+      "operations": [
+        { "name": "list", "method": "POST", "path": "/item/stock/queryList", "description": "商品库存列表", "paginated": true, "write": true, "form_encoded": true },
+        { "name": "count", "method": "POST", "path": "/item/stock/queryCount", "description": "商品库存总数", "write": true, "form_encoded": true },
+        { "name": "get-detail", "method": "GET", "path": "/item/getItemDetail", "description": "商品详情" },
+        { "name": "save", "method": "POST", "path": "/item/saveItem", "description": "保存/修改商品", "write": true },
+        { "name": "update-title", "method": "POST", "path": "/item/saveItem", "description": "修改商品标题（get-detail + save）", "write": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Fetch meta
+        run: ./scripts/fetch_meta/fetch_meta.sh
+
+      - name: Unit tests
+        run: go test -mod=vendor ./...
+
+      - name: E2E smoke
+        run: go test -mod=vendor -v ./tests/cli_e2e/...

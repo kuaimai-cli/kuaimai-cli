@@ -1,0 +1,58 @@
+version: 2
+
+project_name: kuaimai-cli
+
+before:
+  hooks:
+    - go mod tidy
+    - ./scripts/fetch_meta/fetch_meta.sh
+
+builds:
+  - id: kuaimai-cli
+    main: .
+    binary: kuaimai-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/kuaimai/kuaimai-cli/internal/build.Version={{.Version}}
+      - -X github.com/kuaimai/kuaimai-cli/internal/build.Date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - skills/**/*
+      - AGENTS.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: kuaimai
+    name: kuaimai-cli
+  draft: false
+  prerelease: auto
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  disable: true
