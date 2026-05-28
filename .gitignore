@@ -3,7 +3,7 @@
 # Local build artifacts
 kuaimai-cli
 dist/
-build/
+/build/
 *.zip
 log.txt
 stderr*.txt
