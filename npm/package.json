@@ -1,6 +1,6 @@
 {
   "name": "@kuaimai-cli/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "快麦 erp-items-core 商品 CLI（对标飞书 lark-cli 分发模式）",
   "bin": {
     "kuaimai-cli": "scripts/run.js"
@@ -28,6 +28,7 @@
   "files": [
     "scripts/install.js",
     "scripts/install-wizard.js",
+    "scripts/permissions.js",
     "scripts/run.js",
     "checksums.txt"
   ],

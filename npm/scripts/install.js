@@ -38,6 +38,7 @@ const GITHUB_URL = `https://github.com/${REPO}/releases/download/v${VERSION}/${a
 
 const binDir = path.join(__dirname, "..", "bin");
 const dest = path.join(binDir, NAME + (isWindows ? ".exe" : ""));
+const { ensurePackageEntrypoints, ensureExecutable, stripMacOSQuarantine } = require("./permissions");
 
 function getDownloadUrl(env) {
   const override = (env.KUAIMAI_CLI_DOWNLOAD_URL || "").trim();
@@ -178,7 +179,9 @@ function install() {
 
     const binaryName = NAME + (isWindows ? ".exe" : "");
     fs.copyFileSync(path.join(tmpDir, binaryName), dest);
-    fs.chmodSync(dest, 0o755);
+    ensureExecutable(dest);
+    stripMacOSQuarantine(dest);
+    ensurePackageEntrypoints(path.join(__dirname, ".."));
     console.log(`${NAME} v${VERSION} installed successfully`);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

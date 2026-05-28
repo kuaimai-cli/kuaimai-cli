@@ -7,6 +7,7 @@ const p = require("@clack/prompts");
 
 const PKG = "@kuaimai-cli/cli";
 const isWindows = process.platform === "win32";
+const { ensureExecutable, ensurePackageEntrypoints } = require("./permissions");
 
 const messages = {
   zh: {
@@ -68,29 +69,44 @@ function runSilentAsync(cmd, args, opts = {}) {
   });
 }
 
-function whichKuaimaiCli() {
+function globalPackageRoot() {
   try {
     const prefix = execFileSync("npm", ["prefix", "-g"], {
       stdio: ["ignore", "pipe", "pipe"],
     })
       .toString()
       .trim();
-    const candidate = isWindows
-      ? path.join(prefix, "kuaimai-cli.cmd")
-      : path.join(prefix, "bin", "kuaimai-cli");
-    if (fs.existsSync(candidate)) return candidate;
-  } catch (_) {
-    // fall through
-  }
-  try {
-    const cmd = isWindows ? "where" : "which";
-    return execFileSync(cmd, ["kuaimai-cli"], { stdio: ["ignore", "pipe", "pipe"] })
-      .toString()
-      .split("\n")[0]
-      .trim();
+    return path.join(prefix, "lib", "node_modules", PKG);
   } catch (_) {
     return null;
   }
+}
+
+function goBinaryPath(root) {
+  return path.join(root, "bin", "kuaimai-cli" + (isWindows ? ".exe" : ""));
+}
+
+function resolveCliRunner() {
+  const candidates = [
+    goBinaryPath(path.join(__dirname, "..")),
+    globalPackageRoot() ? goBinaryPath(globalPackageRoot()) : null,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      ensureExecutable(candidate);
+      return { cmd: candidate, argsPrefix: [] };
+    }
+  }
+
+  const runJs = path.join(__dirname, "run.js");
+  ensureExecutable(runJs);
+  return { cmd: process.execPath, argsPrefix: [runJs] };
+}
+
+function runCLI(args, opts = {}) {
+  const { cmd, argsPrefix } = resolveCliRunner();
+  return runSilent(cmd, [...argsPrefix, ...args], opts);
 }
 
 function getGloballyInstalledVersion() {
@@ -128,24 +144,24 @@ async function stepInstallGlobally(msg) {
   }
 }
 
-async function skillsAlreadyInstalled(binPath) {
+async function skillsAlreadyInstalled() {
   try {
-    const out = runSilent(binPath, ["skill", "list", "--output", "json"], { timeout: 30000 });
+    const out = runCLI(["skill", "list", "--output", "json"], { timeout: 30000 });
     return /kuaimai-item/.test(out.toString());
   } catch (_) {
     return false;
   }
 }
 
-async function stepInstallSkills(msg, binPath) {
+async function stepInstallSkills(msg) {
   const s = p.spinner();
   s.start(msg.step2Spinner);
   try {
-    if (await skillsAlreadyInstalled(binPath)) {
+    if (await skillsAlreadyInstalled()) {
       s.stop(msg.step2Skip);
       return;
     }
-    runSilent(binPath, ["skill", "install-all"], { timeout: 120000 });
+    runCLI(["skill", "install-all"], { timeout: 120000 });
     s.stop(msg.step2Done);
   } catch (_) {
     s.stop(msg.step2Fail);
@@ -153,11 +169,11 @@ async function stepInstallSkills(msg, binPath) {
   }
 }
 
-async function stepConfigInit(msg, binPath) {
+async function stepConfigInit(msg) {
   const s = p.spinner();
   s.start(msg.step3);
   try {
-    runSilent(binPath, ["config", "init"], { timeout: 15000 });
+    runCLI(["config", "init"], { timeout: 15000 });
     s.stop(msg.step3Done);
   } catch (_) {
     s.stop(msg.step3Fail);
@@ -178,36 +194,34 @@ async function main() {
     p.intro(msg.setup);
     await stepInstallGlobally(msg);
 
-    let binPath = whichKuaimaiCli();
-    if (!binPath) {
-      binPath = path.join(__dirname, "..", "bin", "kuaimai-cli" + (isWindows ? ".exe" : ""));
-      if (!fs.existsSync(binPath)) {
-        execFileSync(process.execPath, [path.join(__dirname, "install.js")], {
-          stdio: "inherit",
-          env: { ...process.env, KUAIMAI_CLI_RUN: "true" },
-        });
-      }
+    ensurePackageEntrypoints(globalPackageRoot() || path.join(__dirname, ".."));
+
+    const runner = resolveCliRunner();
+    const goBin = runner.argsPrefix.length === 0 ? runner.cmd : goBinaryPath(globalPackageRoot() || path.join(__dirname, ".."));
+    if (!fs.existsSync(goBin)) {
+      execFileSync(process.execPath, [path.join(__dirname, "install.js")], {
+        stdio: "inherit",
+        env: { ...process.env, KUAIMAI_CLI_RUN: "true" },
+      });
     }
 
-    await stepInstallSkills(msg, binPath);
-    await stepConfigInit(msg, binPath);
+    await stepInstallSkills(msg);
+    await stepConfigInit(msg);
     await stepAuthHint(msg);
     p.outro(msg.done);
   } else {
     console.log(msg.setup);
     await stepInstallGlobally(msg);
-    const binPath = whichKuaimaiCli();
-    if (binPath) {
-      try {
-        runSilent(binPath, ["skill", "install-all"], { timeout: 120000 });
-      } catch (_) {
-        // best effort
-      }
-      try {
-        runSilent(binPath, ["config", "init"], { timeout: 15000 });
-      } catch (_) {
-        // best effort
-      }
+    ensurePackageEntrypoints(globalPackageRoot() || path.join(__dirname, ".."));
+    try {
+      runCLI(["skill", "install-all"], { timeout: 120000 });
+    } catch (_) {
+      // best effort
+    }
+    try {
+      runCLI(["config", "init"], { timeout: 15000 });
+    } catch (_) {
+      // best effort
     }
     console.log(msg.nonTtyHint);
   }
