@@ -6,10 +6,12 @@ const { execFileSync } = require("child_process");
 const os = require("os");
 const crypto = require("crypto");
 
-const VERSION = require("../package.json").version.replace(/-.*$/, "");
+const pkg = require("../package.json");
+const VERSION = String(pkg.binaryVersion || pkg.version).replace(/-.*$/, "");
 const REPO = "kuaimai-cli/kuaimai-cli";
 const NAME = "kuaimai-cli";
 const DEFAULT_MIRROR_HOST = "https://registry.npmmirror.com";
+const DOWNLOAD_MAX_TIME_SEC = "300";
 
 const ALLOWED_HOSTS = new Set([
   "github.com",
@@ -61,14 +63,17 @@ function isDefaultNpmjsRegistry(url) {
 
 function resolveMirrorUrls(env, archive, version) {
   const binaryPath = `/-/binary/kuaimai-cli/v${version}/${archive}`;
-  const defaultUrl = joinUrl(DEFAULT_MIRROR_HOST, binaryPath);
   const urls = [];
   const registry = (env.npm_config_registry || "").trim();
   if (registry && !isDefaultNpmjsRegistry(registry) && isValidDownloadBase(registry)) {
     const base = new URL(registry);
     urls.push(joinUrl(base.origin + base.pathname, binaryPath));
   }
-  if (!urls.includes(defaultUrl)) urls.push(defaultUrl);
+  const mirror = (env.KUAIMAI_CLI_NPM_MIRROR || "").trim() || DEFAULT_MIRROR_HOST;
+  if (env.KUAIMAI_CLI_USE_NPM_MIRROR === "1") {
+    const mirrorUrl = joinUrl(mirror, binaryPath);
+    if (!urls.includes(mirrorUrl)) urls.push(mirrorUrl);
+  }
   return urls;
 }
 
@@ -89,7 +94,7 @@ function download(url, destPath) {
   assertAllowedHost(url);
   const args = [
     "--fail", "--location", "--silent", "--show-error",
-    "--connect-timeout", "10", "--max-time", "120",
+    "--connect-timeout", "15", "--max-time", DOWNLOAD_MAX_TIME_SEC,
     "--max-redirs", "3",
     "--output", destPath,
   ];
@@ -171,7 +176,11 @@ function install() {
         lastErr = e;
       }
     }
-    if (!downloaded) throw lastErr;
+    if (!downloaded) {
+      const tried = downloadUrls.join("\n  ");
+      const detail = lastErr && lastErr.message ? lastErr.message : String(lastErr);
+      throw new Error(`All download URLs failed:\n  ${tried}\nLast error: ${detail}`);
+    }
 
     verifyChecksum(archivePath, getExpectedChecksum(archiveName));
 
