@@ -1,5 +1,5 @@
-ea0cd212183dc167525a19c8b125e91f9abab44fcca5ced68220a5c4b368747e  kuaimai-cli-0.1.0-darwin-amd64.tar.gz
-a4ce02385e5b909c19658faad6173e1827cd4e76ec3d2a14f18213e7e7cb9e38  kuaimai-cli-0.1.0-darwin-arm64.tar.gz
-f64be11de6f04f3852d7274f95e35026123af48386eba837d409bc02f4206184  kuaimai-cli-0.1.0-linux-amd64.tar.gz
-cbea4e03bce5b997c4f52260b7282b5a1ef6259cece4cfa5802676c096b1d6d5  kuaimai-cli-0.1.0-linux-arm64.tar.gz
-d3211fe65f62accf46790e7a50cdd62215ae8122f9d1fed42056408172cdae87  kuaimai-cli-0.1.0-windows-amd64.zip
+6a10782a6478cf1301ccd5bd9ad266bfa146772c506603b2f9887eef7aeac4f2  kuaimai-cli-0.1.0-darwin-amd64.tar.gz
+d650f7801c94621690a795abf8d7bea9e3ddc47f1a367bbdb37a562b203a192c  kuaimai-cli-0.1.0-darwin-arm64.tar.gz
+57ed6198a76923d60d10d6a1a46da392aaa9f384571d9ba093ca5eca1c19b113  kuaimai-cli-0.1.0-linux-amd64.tar.gz
+138067d96856c9d4b677c0eb4684160b44ed4d00cb9237ac8c9e2913064c9215  kuaimai-cli-0.1.0-linux-arm64.tar.gz
+4706664fb46c2ac45c7d66c385b336b438be7b1f5bc63965c7dbf70ccfca4402  kuaimai-cli-0.1.0-windows-amd64.zip

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// 对标 larksuite/cli/scripts/install.js：npm 薄壳 + postinstall 从 GitHub Release 下载 Go 二进制。
+// 差异：暂不启用 npmmirror / registry 二进制镜像（须维护者同步后才可启用，否则 404）。
 
 const fs = require("fs");
 const path = require("path");
@@ -6,17 +8,14 @@ const { execFileSync } = require("child_process");
 const os = require("os");
 const crypto = require("crypto");
 
-const pkg = require("../package.json");
-const VERSION = String(pkg.binaryVersion || pkg.version).replace(/-.*$/, "");
+const VERSION = require("../package.json").version.replace(/-.*$/, "");
 const REPO = "kuaimai-cli/kuaimai-cli";
 const NAME = "kuaimai-cli";
-const DEFAULT_MIRROR_HOST = "https://registry.npmmirror.com";
-const DOWNLOAD_MAX_TIME_SEC = "300";
 
+// curl --location 会跟随重定向到 objects.githubusercontent.com
 const ALLOWED_HOSTS = new Set([
   "github.com",
   "objects.githubusercontent.com",
-  "registry.npmmirror.com",
 ]);
 
 const PLATFORM_MAP = {
@@ -40,63 +39,37 @@ const GITHUB_URL = `https://github.com/${REPO}/releases/download/v${VERSION}/${a
 const binDir = path.join(__dirname, "..", "bin");
 const dest = path.join(binDir, NAME + (isWindows ? ".exe" : ""));
 
-function joinUrl(base, suffix) {
-  return base.replace(/\/+$/, "") + suffix;
-}
-
-function isValidDownloadBase(raw) {
-  try {
-    const parsed = new URL(raw);
-    return parsed.protocol === "https:" && !!parsed.hostname;
-  } catch (_) {
-    return false;
-  }
-}
-
-function isDefaultNpmjsRegistry(url) {
-  try {
-    return new URL(url).hostname === "registry.npmjs.org";
-  } catch (_) {
-    return false;
-  }
-}
-
-function resolveMirrorUrls(env, archive, version) {
-  const binaryPath = `/-/binary/kuaimai-cli/v${version}/${archive}`;
-  const urls = [];
-  const registry = (env.npm_config_registry || "").trim();
-  if (registry && !isDefaultNpmjsRegistry(registry) && isValidDownloadBase(registry)) {
-    const base = new URL(registry);
-    urls.push(joinUrl(base.origin + base.pathname, binaryPath));
-  }
-  const mirror = (env.KUAIMAI_CLI_NPM_MIRROR || "").trim() || DEFAULT_MIRROR_HOST;
-  if (env.KUAIMAI_CLI_USE_NPM_MIRROR === "1") {
-    const mirrorUrl = joinUrl(mirror, binaryPath);
-    if (!urls.includes(mirrorUrl)) urls.push(mirrorUrl);
-  }
-  return urls;
+function getDownloadUrl(env) {
+  const override = (env.KUAIMAI_CLI_DOWNLOAD_URL || "").trim();
+  return override || GITHUB_URL;
 }
 
 function assertAllowedHost(url) {
   const { hostname } = new URL(url);
-  if (!ALLOWED_HOSTS.has(hostname)) {
-    throw new Error(`Download host not allowed: ${hostname}`);
-  }
+  if (ALLOWED_HOSTS.has(hostname)) return;
+  if (envAllowHost(hostname)) return;
+  throw new Error(`Download host not allowed: ${hostname}`);
 }
 
-function getMirrorUrls(env) {
-  const urls = resolveMirrorUrls(env, archiveName, VERSION);
-  for (const u of urls) ALLOWED_HOSTS.add(new URL(u).hostname);
-  return urls;
+function envAllowHost(hostname) {
+  return process.env.KUAIMAI_CLI_ALLOW_DOWNLOAD_HOST === hostname;
 }
 
 function download(url, destPath) {
   assertAllowedHost(url);
   const args = [
-    "--fail", "--location", "--silent", "--show-error",
-    "--connect-timeout", "15", "--max-time", DOWNLOAD_MAX_TIME_SEC,
-    "--max-redirs", "3",
-    "--output", destPath,
+    "--fail",
+    "--location",
+    "--silent",
+    "--show-error",
+    "--connect-timeout",
+    "10",
+    "--max-time",
+    "120",
+    "--max-redirs",
+    "3",
+    "--output",
+    destPath,
   ];
   if (isWindows) args.unshift("--ssl-revoke-best-effort");
   args.push(url);
@@ -105,12 +78,38 @@ function download(url, destPath) {
 
 function extractZipWindows(archivePath, destDir) {
   const psOpts = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"];
-  const psEnv = { ...process.env, KUAIMAI_CLI_ARCHIVE: archivePath, KUAIMAI_CLI_DEST: destDir };
-  const dotnet =
-    "$ErrorActionPreference='Stop';" +
-    "Add-Type -AssemblyName System.IO.Compression.FileSystem;" +
-    "[System.IO.Compression.ZipFile]::ExtractToDirectory($env:KUAIMAI_CLI_ARCHIVE,$env:KUAIMAI_CLI_DEST)";
-  execFileSync("powershell.exe", [...psOpts, dotnet], { stdio: "inherit", env: psEnv });
+  const psStdio = ["ignore", "inherit", "inherit"];
+  const psEnv = {
+    ...process.env,
+    KUAIMAI_CLI_ARCHIVE: archivePath,
+    KUAIMAI_CLI_DEST: destDir,
+  };
+
+  try {
+    const dotnet =
+      "$ErrorActionPreference='Stop';" +
+      "Add-Type -AssemblyName System.IO.Compression.FileSystem;" +
+      "[System.IO.Compression.ZipFile]::ExtractToDirectory($env:KUAIMAI_CLI_ARCHIVE,$env:KUAIMAI_CLI_DEST)";
+    execFileSync("powershell.exe", [...psOpts, dotnet], { stdio: psStdio, env: psEnv });
+  } catch (primaryErr) {
+    try {
+      const cmdlet =
+        "$ErrorActionPreference='Stop';" +
+        "Expand-Archive -LiteralPath $env:KUAIMAI_CLI_ARCHIVE -DestinationPath $env:KUAIMAI_CLI_DEST -Force";
+      execFileSync("powershell.exe", [...psOpts, cmdlet], { stdio: psStdio, env: psEnv });
+    } catch (secondErr) {
+      try {
+        execFileSync("tar", ["-xf", archivePath, "-C", destDir], { stdio: psStdio });
+      } catch (fallbackErr) {
+        throw new Error(
+          `Failed to extract ${archivePath}. ` +
+            `.NET ZipFile: ${primaryErr.message}; ` +
+            `Expand-Archive: ${secondErr.message}; ` +
+            `tar: ${fallbackErr.message}`
+        );
+      }
+    }
+  }
 }
 
 function getExpectedChecksum(archive) {
@@ -119,8 +118,8 @@ function getExpectedChecksum(archive) {
     console.error("[WARN] checksums.txt not found, skipping checksum verification");
     return null;
   }
-  const content = fs.readFileSync(checksumsPath, "utf8").trim();
-  if (!content || content.startsWith("#")) return null;
+
+  const content = fs.readFileSync(checksumsPath, "utf8");
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -130,11 +129,13 @@ function getExpectedChecksum(archive) {
     const name = trimmed.slice(idx + 2);
     if (name === archive) return hash;
   }
-  return null;
+
+  throw new Error(`Checksum entry not found for ${archive}`);
 }
 
 function verifyChecksum(archivePath, expectedHash) {
-  if (!expectedHash) return;
+  if (expectedHash === null) return;
+
   const hash = crypto.createHash("sha256");
   const fd = fs.openSync(archivePath, "r");
   try {
@@ -148,7 +149,9 @@ function verifyChecksum(archivePath, expectedHash) {
   }
   const actual = hash.digest("hex");
   if (actual.toLowerCase() !== expectedHash.toLowerCase()) {
-    throw new Error(`Checksum mismatch: expected ${expectedHash}, got ${actual}`);
+    throw new Error(
+      `[SECURITY] Checksum mismatch for ${path.basename(archivePath)}: expected ${expectedHash} but got ${actual}`
+    );
   }
 }
 
@@ -157,31 +160,14 @@ function install() {
     throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
   }
 
-  const mirrorUrls = getMirrorUrls(process.env);
-  const downloadUrls = [GITHUB_URL, ...mirrorUrls];
+  const downloadUrl = getDownloadUrl(process.env);
   fs.mkdirSync(binDir, { recursive: true });
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kuaimai-cli-"));
   const archivePath = path.join(tmpDir, archiveName);
 
   try {
-    let lastErr;
-    let downloaded = false;
-    for (const url of downloadUrls) {
-      try {
-        download(url, archivePath);
-        downloaded = true;
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    if (!downloaded) {
-      const tried = downloadUrls.join("\n  ");
-      const detail = lastErr && lastErr.message ? lastErr.message : String(lastErr);
-      throw new Error(`All download URLs failed:\n  ${tried}\nLast error: ${detail}`);
-    }
-
+    download(downloadUrl, archivePath);
     verifyChecksum(archivePath, getExpectedChecksum(archiveName));
 
     if (isWindows) {
@@ -199,7 +185,31 @@ function install() {
   }
 }
 
+function formatInstallError(err, downloadUrl) {
+  const releasePage = `https://github.com/${REPO}/releases/tag/v${VERSION}`;
+  return [
+    err && err.message ? err.message : "download failed",
+    "",
+    `Source: GitHub Release only (same as @larksuite/cli, without npmmirror fallback)`,
+    `URL: ${downloadUrl}`,
+    "",
+    "If you are behind a firewall or in a restricted network, try one of:",
+    "  # 1. Use a proxy:",
+    "  export https_proxy=http://your-proxy:port",
+    "  npm install -g @kuaimai-cli/cli",
+    "",
+    "  # 2. Manual install from Release:",
+    `  open ${releasePage}`,
+    `  download ${archiveName}, extract, and put kuaimai-cli on your PATH`,
+    "",
+    "  # 3. Point install.js at a mirror you control:",
+    `  export KUAIMAI_CLI_DOWNLOAD_URL="<url-to-${archiveName}>"`,
+    "  npm install -g @kuaimai-cli/cli",
+  ].join("\n");
+}
+
 if (require.main === module) {
+  // npx … install 向导不需要二进制；run.js 会以 KUAIMAI_CLI_RUN=1 触发下载
   const isNpxPostinstall =
     process.env.npm_command === "exec" && !process.env.KUAIMAI_CLI_RUN;
 
@@ -210,9 +220,15 @@ if (require.main === module) {
   try {
     install();
   } catch (err) {
-    console.error(`Failed to install ${NAME}:`, err.message);
+    console.error(`Failed to install ${NAME}:\n${formatInstallError(err, getDownloadUrl(process.env))}`);
     process.exit(1);
   }
 }
 
-module.exports = { install };
+module.exports = {
+  install,
+  GITHUB_URL,
+  archiveName,
+  getExpectedChecksum,
+  verifyChecksum,
+};

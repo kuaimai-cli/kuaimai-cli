@@ -86,7 +86,7 @@ kuaimai-cli-{version}-{os}-{arch}.tar.gz   # macOS / Linux
 kuaimai-cli-{version}-windows-{arch}.zip   # Windows
 ```
 
-`install.js` 中仓库默认为 `kuaimai/kuaimai-cli`；若实际 GitHub 路径不同，须改 `REPO` 常量。
+`install.js` 中仓库默认为 `kuaimai-cli/kuaimai-cli`；若实际 GitHub 路径不同，须改 `REPO` 常量。
 
 ### 4.3 支持的平台
 
@@ -130,8 +130,8 @@ kuaimai-cli auth check --output json
 
 | 方式 | 场景 |
 |------|------|
-| [GitHub Releases](https://github.com/kuaimai/kuaimai-cli/releases) 下载二进制 | 无 Node、仅要 CLI |
-| `go install github.com/kuaimai/kuaimai-cli@latest` | 开发者本机 |
+| [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载二进制 | 无 Node、仅要 CLI |
+| `go install github.com/kuaimai-cli/kuaimai-cli@latest` | 开发者本机 |
 | [内部分发压缩包](./kuaimai-cli-内部分发与使用.md) | 内网离线、`dist` + `skills` |
 
 ---
@@ -193,7 +193,7 @@ npx @kuaimai-cli/cli@latest item +list --body '{"pageNo":1,"pageSize":10}' --out
 
 ### 7.2 配置 GitHub
 
-1. 仓库建议为 **`kuaimai/kuaimai-cli`**（与 `release.yml` 中 `if: github.repository == 'kuaimai/kuaimai-cli'` 一致；否则需改 workflow）。
+1. 仓库建议为 **`kuaimai-cli/kuaimai-cli`**（与 `release.yml` 中 `if: github.repository == 'kuaimai-cli/kuaimai-cli'` 一致；否则需改 workflow）。
 2. Settings → Secrets → Actions → 添加 **`NPM_TOKEN`**（上一步的 token）。
 
 ### 7.3 打 tag 触发 Release + npm publish
@@ -256,7 +256,7 @@ cd npm && npm publish --access public
 | 方案 | 说明 |
 |------|------|
 | **私有 registry** | 将 `npm/` 同样 `npm publish` 到公司 Verdaccio 等；用户 `npm config set registry <内网 URL>` 后执行 `npx @kuaimai-cli/cli install` |
-| **二进制镜像** | `install.js` 会读 `npm_config_registry`，非 npmjs 时尝试从 registry 的 `/-/binary/kuaimai-cli/v{version}/` 拉包；默认还尝试 `registry.npmmirror.com` |
+| **二进制镜像** | 与飞书 `@larksuite/cli` 相同：**默认仅 GitHub Release**；飞书在 npmmirror 有同步二进制故可作回退，kuaimai 暂未同步 npmmirror（避免 404） |
 | **压缩包分发** | 不经过 npm，见 [内部分发与使用](./kuaimai-cli-内部分发与使用.md) |
 
 私有 registry **只解决「npm 薄壳从哪下」**；Go 二进制仍须来自 **Release 或同步到镜像的二进制路径**。

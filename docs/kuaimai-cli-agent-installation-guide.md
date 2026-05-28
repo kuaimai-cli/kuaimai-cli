@@ -14,7 +14,7 @@
 - 以下任选其一：
   - **Node.js**（npm/npx，用于 `npx @kuaimai-cli/cli install`）
   - **Go 1.22+**（用于 `go install`）
-  - 或从 [GitHub Releases](https://github.com/kuaimai/kuaimai-cli/releases) 下载预编译二进制
+  - 或从 [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载预编译二进制
 
 ---
 
@@ -31,14 +31,14 @@ npx @kuaimai-cli/cli@latest install
 ### 方式 B — go install
 
 ```shell
-go install github.com/kuaimai/kuaimai-cli@latest
+go install github.com/kuaimai-cli/kuaimai-cli@latest
 ```
 
 确保 `$GOPATH/bin` 或 `$HOME/go/bin` 在 `PATH` 中。
 
 ### 方式 C — 下载 Release 二进制
 
-从 [GitHub Releases](https://github.com/kuaimai/kuaimai-cli/releases) 下载对应平台的 `kuaimai-cli-{version}-{os}-{arch}.tar.gz`，解压后将 `kuaimai-cli` 放入 `PATH`。
+从 [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载对应平台的 `kuaimai-cli-{version}-{os}-{arch}.tar.gz`，解压后将 `kuaimai-cli` 放入 `PATH`。
 
 ### 方式 D — 内部分发压缩包（Codex / 离线）
 
@@ -68,7 +68,7 @@ kuaimai-cli skill install kuaimai-shared
 指定仓库：
 
 ```shell
-kuaimai-cli skill install-all --repo kuaimai/kuaimai-cli
+kuaimai-cli skill install-all --repo kuaimai-cli/kuaimai-cli
 ```
 
 ### 从本地仓库（已 clone 时）

@@ -16,7 +16,7 @@ npx @kuaimai-cli/cli@latest install
 
 ### 或下载 Release 二进制
 
-从 [GitHub Releases](https://github.com/kuaimai/kuaimai-cli/releases) 下载 `kuaimai-cli-{version}-{os}-{arch}.tar.gz`，解压后加入 `PATH`。
+从 [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载 `kuaimai-cli-{version}-{os}-{arch}.tar.gz`，解压后加入 `PATH`。
 
 ### 安装 Skills
 
