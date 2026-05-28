@@ -12,7 +12,7 @@
 
 - macOS / Linux / Windows（amd64 或 arm64）
 - 以下任选其一：
-  - **Node.js**（npm/npx，用于 `npx @kuaimai/cli install`）
+  - **Node.js**（npm/npx，用于 `npx @kuaimai-cli/cli install`）
   - **Go 1.22+**（用于 `go install`）
   - 或从 [GitHub Releases](https://github.com/kuaimai/kuaimai-cli/releases) 下载预编译二进制
 
@@ -23,7 +23,7 @@
 ### 方式 A — npm 一键安装（推荐，对标飞书）
 
 ```shell
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 ```
 
 非交互环境（Agent 调用）时，向导会输出后续需用户手动完成的步骤。
@@ -159,7 +159,7 @@ kuaimai-cli auth use prod
 
 ## 非 TTY 环境提示
 
-若 Agent 在无交互终端中运行 `npx @kuaimai/cli install`，向导会跳过交互步骤并输出：
+若 Agent 在无交互终端中运行 `npx @kuaimai-cli/cli install`，向导会跳过交互步骤并输出：
 
 ```text
 kuaimai-cli config init

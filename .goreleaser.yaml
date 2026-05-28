@@ -4,7 +4,6 @@ project_name: kuaimai-cli
 
 before:
   hooks:
-    - go mod tidy
     - ./scripts/fetch_meta/fetch_meta.sh
 
 builds:

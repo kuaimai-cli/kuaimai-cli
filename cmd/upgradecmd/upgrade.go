@@ -16,7 +16,7 @@ func upgradeCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "upgrade",
 		Short: "检查 GitHub 是否有新版本",
-		Long:  "对比当前 kuaimai-cli 与 GitHub Release 最新版本；安装请使用 npx @kuaimai/cli@latest install 或从 Release 页下载二进制。",
+		Long:  "对比当前 kuaimai-cli 与 GitHub Release 最新版本；安装请使用 npx @kuaimai-cli/cli@latest install 或从 Release 页下载二进制。",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := cmdutil.NewFactory()
 			if err != nil {
@@ -30,6 +30,6 @@ func upgradeCmd() *cobra.Command {
 			return f.Printer().Success(res)
 		},
 	}
-	c.Flags().StringVar(&repo, "repo", "", "GitHub 仓库 owner/name（默认 kuaimai/kuaimai-cli）")
+	c.Flags().StringVar(&repo, "repo", "", "GitHub 仓库 owner/name（默认 kuaimai-cli/kuaimai-cli）")
 	return c
 }

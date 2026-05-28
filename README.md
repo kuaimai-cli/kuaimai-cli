@@ -6,7 +6,7 @@
 
 ```bash
 # 安装（任选其一）
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 # 或从 Release 下载二进制：https://github.com/kuaimai/kuaimai-cli/releases
 
 kuaimai-cli config init

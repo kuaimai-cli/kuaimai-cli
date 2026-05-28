@@ -25,7 +25,7 @@ metadata:
 
 ```bash
 # 1. 安装 CLI（任选其一）
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 # 或: go install github.com/kuaimai/kuaimai-cli@latest
 
 # 2. 安装 Skills（商品域必读 kuaimai-item）
@@ -125,7 +125,7 @@ kuaimai-cli skill install-all                 # kuaimai-shared + kuaimai-item
 |------|------|
 | 提示未登录 / 401 | `auth status` → 引导 `auth login` |
 | `ok: false` 且无网络错误 | 读 `error`、`hint`；必要时加 `--verbose` 重试 |
-| 命令找不到 | 检查 `KUAIMAI_CLI` / PATH / `npx @kuaimai/cli` 是否已安装 |
+| 命令找不到 | 检查 `KUAIMAI_CLI` / PATH / `npx @kuaimai-cli/cli` 是否已安装 |
 | Skill 行为不符合预期 | `skill install-all` 或 `skill install kuaimai-item`，并重开 Agent |
 
 ## 域 Skill 路由

@@ -23,4 +23,4 @@
 
 - 阶段一～三：config / auth / api / item 域（list、count、get-detail、save）
 - Skill：kuaimai-item、kuaimai-shared
-- npm `@kuaimai/cli` 与 GitHub Release 分发
+- npm `@kuaimai-cli/cli` 与 GitHub Release 分发

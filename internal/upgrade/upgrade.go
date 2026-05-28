@@ -11,7 +11,7 @@ import (
 	"github.com/kuaimai/kuaimai-cli/internal/build"
 )
 
-const defaultRepo = "kuaimai/kuaimai-cli"
+const defaultRepo = "kuaimai-cli/kuaimai-cli"
 
 // ReleaseInfo is a subset of GitHub release JSON.
 type ReleaseInfo struct {
@@ -47,7 +47,7 @@ func CheckLatest(repo string) (*CheckResult, error) {
 		UpdateAvail: versionLess(current, latest),
 	}
 	if res.UpdateAvail {
-		res.Hint = fmt.Sprintf("可执行 npx @kuaimai/cli@latest install 或从 %s 下载新版本", rel.HTMLURL)
+		res.Hint = fmt.Sprintf("可执行 npx @kuaimai-cli/cli@latest install 或从 %s 下载新版本", rel.HTMLURL)
 	} else {
 		res.Hint = "当前已是最新版本（或本地 dev 构建）"
 	}

@@ -77,7 +77,7 @@ func hintPath(p string) string {
 	if p != "" {
 		return p
 	}
-	return "将 kuaimai-cli 加入 PATH，或使用 npx @kuaimai/cli"
+	return "将 kuaimai-cli 加入 PATH，或使用 npx @kuaimai-cli/cli"
 }
 
 func hintSkill(ok bool) string {

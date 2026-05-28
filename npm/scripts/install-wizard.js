@@ -5,7 +5,7 @@ const path = require("path");
 const { execFileSync, execFile } = require("child_process");
 const p = require("@clack/prompts");
 
-const PKG = "@kuaimai/cli";
+const PKG = "@kuaimai-cli/cli";
 const isWindows = process.platform === "win32";
 
 const messages = {

@@ -1,5 +1,5 @@
 {
-  "name": "@kuaimai/cli",
+  "name": "@kuaimai-cli/cli",
   "version": "0.1.0",
   "description": "快麦 erp-items-core 商品 CLI（对标飞书 lark-cli 分发模式）",
   "bin": {

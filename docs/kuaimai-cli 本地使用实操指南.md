@@ -11,7 +11,7 @@
 ### npm 一键安装（对标飞书）
 
 ```bash
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 ```
 
 ### 或下载 Release 二进制

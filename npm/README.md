@@ -1,4 +1,4 @@
-# @kuaimai/cli npm 包
+# @kuaimai-cli/cli npm 包
 
 对标飞书 `@larksuite/cli`：npm 包为 **薄壳**，`postinstall` / `run.js` 从 GitHub Release 下载 Go 二进制。
 
@@ -28,5 +28,5 @@ cd npm && npm publish --access public
 ## 用户安装
 
 ```bash
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 ```

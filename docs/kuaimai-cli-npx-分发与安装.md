@@ -1,6 +1,6 @@
 # kuaimai-cli：对标飞书的 npx 一键安装与升级
 
-本文说明如何实现、发布和使用 **飞书式** `npx @kuaimai/cli@latest install` 分发能力：原理、仓库现状、发布步骤、用户命令，以及与飞书的差异。
+本文说明如何实现、发布和使用 **飞书式** `npx @kuaimai-cli/cli@latest install` 分发能力：原理、仓库现状、发布步骤、用户命令，以及与飞书的差异。
 
 > **读者**：维护者（首次发版 / 日常发版）、用户与 Agent 安装负责人。  
 > **相关**：[Agent 安装指南](./kuaimai-cli-agent-installation-guide.md) · [内部分发](./kuaimai-cli-内部分发与使用.md) · [npm/ 目录说明](../npm/README.md) · [系统架构与飞书对标](./系统架构与飞书对标说明.md)
@@ -13,7 +13,7 @@
 |------|------|
 | 飞书 `npx @larksuite/cli install` 本质是什么？ | **npm 公网 registry 上的薄壳包** + **按平台从 Release 下载的 Go 二进制** |
 | kuaimai-cli 代码侧做完了吗？ | **是**。`npm/`、`install.js`、`release.yml`、GoReleaser 已具备 |
-| 用户现在能直接 `npx` 吗？ | **取决于是否已发布**：`@kuaimai/cli` 需出现在 registry，且 GitHub Release 有对应版本资产 |
+| 用户现在能直接 `npx` 吗？ | **取决于是否已发布**：`@kuaimai-cli/cli` 需出现在 registry，且 GitHub Release 有对应版本资产 |
 | 和飞书是否 1:1？ | **安装形态接近**；鉴权、升级自动替换二进制、命令名等与飞书仍有差异（见 §8） |
 
 **一句话**：不是「再写一个 npm 壳」，而是 **打 tag → GitHub Release → 发布到 npm registry**。
@@ -34,13 +34,13 @@
 ## 3. 原理：飞书与我们相同的部分
 
 ```text
-用户执行:  npx @kuaimai/cli@latest install
+用户执行:  npx @kuaimai-cli/cli@latest install
                 │
                 ▼
-        npm 从 registry 拉取 @kuaimai/cli（薄壳，几 KB～几十 KB）
+        npm 从 registry 拉取 @kuaimai-cli/cli（薄壳，几 KB～几十 KB）
                 │
                 ├─► 子命令 install → scripts/install-wizard.js
-                │       · npm install -g @kuaimai/cli（全局命令 kuaimai-cli）
+                │       · npm install -g @kuaimai-cli/cli（全局命令 kuaimai-cli）
                 │       · skill install-all、config init、登录提示
                 │
                 └─► postinstall / 首次运行 → scripts/install.js
@@ -69,7 +69,7 @@ kuaimai-cli item +list ...
 
 | 路径 | 职责 |
 |------|------|
-| [`npm/package.json`](../npm/package.json) | 包名 `@kuaimai/cli`，`bin.kuaimai-cli` → `scripts/run.js` |
+| [`npm/package.json`](../npm/package.json) | 包名 `@kuaimai-cli/cli`，`bin.kuaimai-cli` → `scripts/run.js` |
 | [`npm/scripts/run.js`](../npm/scripts/run.js) | 入口：`install` 走向导；其它参数转发给 Go 二进制 |
 | [`npm/scripts/install.js`](../npm/scripts/install.js) | 按平台下载 Release 资产，写入 `npm/bin/` |
 | [`npm/scripts/install-wizard.js`](../npm/scripts/install-wizard.js) | 交互式一键安装（全局 npm、Skill、config） |
@@ -103,14 +103,14 @@ kuaimai-cli-{version}-windows-{arch}.zip   # Windows
 ### 5.1 推荐命令（对标飞书）
 
 ```bash
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 ```
 
 前置：本机已安装 **Node.js 16+**（含 `npm` / `npx`），能访问 **registry** 与 **GitHub Release**（或已配置的镜像）。
 
 ### 5.2 安装向导会做什么
 
-1. `npm install -g @kuaimai/cli`（若尚未全局安装）
+1. `npm install -g @kuaimai-cli/cli`（若尚未全局安装）
 2. 下载当前 npm 包版本对应的 Go 二进制（`postinstall` / 首次运行）
 3. `kuaimai-cli skill install-all`
 4. `kuaimai-cli config init`
@@ -151,13 +151,13 @@ kuaimai-cli upgrade --output json
 与飞书类似，升级 = **重新安装新版本**：
 
 ```bash
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 ```
 
 或：
 
 ```bash
-npm install -g @kuaimai/cli@latest
+npm install -g @kuaimai-cli/cli@latest
 ```
 
 然后再次确认：
@@ -174,7 +174,7 @@ kuaimai-cli upgrade
 未全局安装时，也可：
 
 ```bash
-npx @kuaimai/cli@latest item +list --body '{"pageNo":1,"pageSize":10}' --output json
+npx @kuaimai-cli/cli@latest item +list --body '{"pageNo":1,"pageSize":10}' --output json
 ```
 
 `run.js` 会在缺少二进制时尝试触发 `install.js` 下载。
@@ -188,7 +188,7 @@ npx @kuaimai/cli@latest item +list --body '{"pageNo":1,"pageSize":10}' --output 
 ### 7.1 准备 npm 账号与 scope
 
 1. 注册 [npmjs.com](https://www.npmjs.com/) 账号。
-2. 创建或使用组织 **`@kuaimai`**，确保有权限发布 `@kuaimai/cli`。
+2. 使用个人 scope **`@kuaimai-cli`**，确保有权限发布 `@kuaimai-cli/cli`。
 3. 创建 **Automation Token**（用于 CI `npm publish`）。
 
 ### 7.2 配置 GitHub
@@ -213,11 +213,11 @@ GitHub Actions 将依次：
 ### 7.4 验证发布成功
 
 ```bash
-npm view @kuaimai/cli version
-npm view @kuaimai/cli bin
+npm view @kuaimai-cli/cli version
+npm view @kuaimai-cli/cli bin
 
-npx @kuaimai/cli@latest --version
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest --version
+npx @kuaimai-cli/cli@latest install
 ```
 
 ### 7.5 手动发布（仅当 CI 不可用时）
@@ -238,7 +238,7 @@ cd npm && npm publish --access public
 1. 合并代码，更新 CHANGELOG
 2. git tag vX.Y.Z && git push origin vX.Y.Z
 3. 等待 Actions 完成 Release + npm
-4. 通知用户：npx @kuaimai/cli@latest install 或 npm install -g @kuaimai/cli@latest
+4. 通知用户：npx @kuaimai-cli/cli@latest install 或 npm install -g @kuaimai-cli/cli@latest
 ```
 
 **版本对齐规则**：
@@ -255,7 +255,7 @@ cd npm && npm publish --access public
 
 | 方案 | 说明 |
 |------|------|
-| **私有 registry** | 将 `npm/` 同样 `npm publish` 到公司 Verdaccio 等；用户 `npm config set registry <内网 URL>` 后执行 `npx @kuaimai/cli install` |
+| **私有 registry** | 将 `npm/` 同样 `npm publish` 到公司 Verdaccio 等；用户 `npm config set registry <内网 URL>` 后执行 `npx @kuaimai-cli/cli install` |
 | **二进制镜像** | `install.js` 会读 `npm_config_registry`，非 npmjs 时尝试从 registry 的 `/-/binary/kuaimai-cli/v{version}/` 拉包；默认还尝试 `registry.npmmirror.com` |
 | **压缩包分发** | 不经过 npm，见 [内部分发与使用](./kuaimai-cli-内部分发与使用.md) |
 
@@ -287,11 +287,11 @@ KUAIMAI_CLI_RUN=true node scripts/install.js
 
 ## 11. 与飞书 lark-cli 的差异
 
-| 项 | 飞书 `@larksuite/cli` | kuaimai `@kuaimai/cli` |
+| 项 | 飞书 `@larksuite/cli` | kuaimai `@kuaimai-cli/cli` |
 |----|----------------------|-------------------------|
 | 全局命令名 | `lark-cli` | `kuaimai-cli` |
 | 二进制来源 | Release 下载 | 同左 |
-| 一键安装命令 | `npx @larksuite/cli@latest install` | `npx @kuaimai/cli@latest install` |
+| 一键安装命令 | `npx @larksuite/cli@latest install` | `npx @kuaimai-cli/cli@latest install` |
 | 登录 | OAuth、`auth login --recommend` | 手动 `auth login "<accessToken>"` |
 | `upgrade` | 生态较成熟 | 仅检查版本 + 提示重装 |
 | 安装后 Skill | 飞书多域 Skill | `kuaimai-shared` + `kuaimai-item` |
@@ -301,7 +301,7 @@ KUAIMAI_CLI_RUN=true node scripts/install.js
 
 ## 12. 常见问题
 
-### `npm error 404 '@kuaimai/cli'`
+### `npm error 404 '@kuaimai-cli/cli'`
 
 包尚未发布到当前 registry，或 scope/包名错误。维护者完成 §7；用户确认 `npm config get registry`。
 
@@ -341,7 +341,7 @@ npx 每次可能拉最新包；已安装可改用全局 `kuaimai-cli`。
 **用户安装**
 
 ```bash
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 kuaimai-cli auth login "<accessToken>"
 kuaimai-cli auth check
 ```
@@ -350,7 +350,7 @@ kuaimai-cli auth check
 
 ```bash
 kuaimai-cli upgrade
-npx @kuaimai/cli@latest install
+npx @kuaimai-cli/cli@latest install
 ```
 
 **维护者首发**
@@ -358,5 +358,5 @@ npx @kuaimai/cli@latest install
 ```bash
 # NPM_TOKEN in GitHub Secrets
 git tag v0.1.0 && git push origin v0.1.0
-npm view @kuaimai/cli version
+npm view @kuaimai-cli/cli version
 ```
