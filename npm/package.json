@@ -22,7 +22,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kuaimai/kuaimai-cli.git"
+    "url": "git+https://github.com/kuaimai-cli/kuaimai-cli.git"
   },
   "license": "MIT",
   "files": [

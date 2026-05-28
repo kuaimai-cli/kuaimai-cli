@@ -7,7 +7,7 @@ const os = require("os");
 const crypto = require("crypto");
 
 const VERSION = require("../package.json").version.replace(/-.*$/, "");
-const REPO = "kuaimai/kuaimai-cli";
+const REPO = "kuaimai-cli/kuaimai-cli";
 const NAME = "kuaimai-cli";
 const DEFAULT_MIRROR_HOST = "https://registry.npmmirror.com";
 

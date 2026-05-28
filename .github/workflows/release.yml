@@ -53,7 +53,7 @@ jobs:
   npm-publish:
     needs: [goreleaser, npm-checksums]
     runs-on: ubuntu-latest
-    if: github.repository == 'kuaimai/kuaimai-cli'
+    if: github.repository == 'kuaimai-cli/kuaimai-cli'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
