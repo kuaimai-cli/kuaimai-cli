@@ -10,7 +10,8 @@ builds:
   - id: kuaimai-cli
     main: .
     binary: kuaimai-cli
-    mod: mod
+    flags:
+      - -mod=vendor
     env:
       - CGO_ENABLED=0
     goos:
