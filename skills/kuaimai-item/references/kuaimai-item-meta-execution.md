@@ -87,7 +87,7 @@ CLI 内部分片合并（每 500 条一块）以降低内存峰值。Agent 仍�
 
 **查询接口**（不可 dry-run）：
 
-- `stock-list`、`stock-count`、`item-detail`、`item-query-list-v2`
+- `stock-list`、`stock-count`、`item-detail`、`item-query-count`、`item-query-list-v2`
 
 ## 5. Schema 能力
 
@@ -101,7 +101,7 @@ CLI 内部分片合并（每 500 条一块）以降低内存峰值。Agent 仍�
 
 - 成功时 `ok === true`，业务数据在 `data`
 - 列表接口：`data` 为数组，或嵌套在 `data.list` / `data.records` 等（CLI 会 NormalizeList）
-- 统计接口：`stock-count` 总数在 `data.data.total`
+- 统计接口：`stock-count`（`item count`）、`item-query-count` 总数在 `data.data.total`；档案 vs 库存选型见 [`kuaimai-item-count-dimensions.md`](kuaimai-item-count-dimensions.md)
 
 ### 何时查 schema
 

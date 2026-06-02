@@ -40,7 +40,7 @@
 ### 业务与命令
 
 - **shortcuts**：`item +list` / `list` / `count` / `get-detail` / `save` / `update-title`
-- **meta 核心 6 个**（有 shortcut 映射）：`stock-list`、`stock-count`、`item-detail`、`item-save`、`item-update-title`；另有 **`item-query-list-v2`**（仅 service，Skill 已文档化）
+- **meta 核心 6 个**（有 shortcut 映射）：`stock-list`、`stock-count`、`item-detail`、`item-save`、`item-update-title`；另有 **`item-query-count`**、**`item-query-list-v2`**（仅 service，Skill 已文档化；统计/列表区分见 `skills/kuaimai-item/references/kuaimai-item-count-dimensions.md`）
 - **双轨**：Agent **优先 shortcuts**；原子兜底 `service item <operation>`（operation 名为 `stock-list` 等，**非** `list`）
 - **contentType**：`get_query` · `post_form` · `post_json`
 - **分页**：`--page-all` + **`--page-limit`** + **`--page-confirm`**（500/1000 阈值交互续查，见 `internal/pagination`）

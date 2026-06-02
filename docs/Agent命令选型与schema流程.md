@@ -146,7 +146,8 @@ flowchart LR
 |----------|-----------------|------|
 | 搜/列商品（库存页） | `item +list` | `service item stock-list` |
 | 搜/列商品（档案 V2） | `service item item-query-list-v2` | `item +list`（path 不同） |
-| 统计数量 | `item count` | `item +list` 再人工数 |
+| 统计数量（库存页 / 标题） | `item count` | `item +list` 再人工数 |
+| 统计数量（商品档案 / 品牌类目等） | `service item item-query-count` | `item count`（库存口径）、`item-query-list-v2` 仅取 total |
 | 查详情 | `item get-detail --sys-item-id` | `service item item-detail --body '{"sysItemId":…}'` |
 | 改标题 | `item update-title` | `service item item-update-title`（无 get-detail 编排） |
 | 复杂改字段 | `item save` + references | `service item item-save` 须全量 body |

@@ -70,7 +70,7 @@ kuaimai-cli service item item-query-list-v2 \
 本接口 `pageable:true`，`--page-all` 可能拉取大量数据。Agent **必须**：
 
 1. 用户未明确要求「全部」时，只用单页（`pageNo:1, pageSize:50`）
-2. 需要全量时，先用相同筛选条件单页或 `stock-count` 类接口评估规模
+2. 需要全量时，先用相同筛选条件的 **`item-query-count`** 评估规模（档案维度）；库存页可用 `item count`
 3. 已拉取 > 500 条或预估 > 1000 条时，**询问用户**是否继续
 4. CLI 硬上限 1000 页；达到后返回已拉取部分并告知用户
 
@@ -78,7 +78,8 @@ kuaimai-cli service item item-query-list-v2 \
 
 - 用户只说「搜标题含 XX 的商品」且未指定档案/库存页 → 默认 **`item +list`**（shortcut 更简单）
 - 用户提到档案、商家编码、`itemType`、类目筛选 → 用 **本接口**
-- 统计数量 → 优先 `item count`（库存维度）；V2 无专用 count shortcut
+- 统计数量（档案维度）→ **`service item item-query-count`**，见 [`kuaimai-item-query-count.md`](kuaimai-item-query-count.md) 与 [`kuaimai-item-count-dimensions.md`](kuaimai-item-count-dimensions.md)
+- 统计数量（仅标题、库存页）→ `item count`
 
 ## 禁止
 

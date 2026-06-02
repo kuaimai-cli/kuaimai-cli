@@ -34,6 +34,7 @@ kuaimai-cli upgrade                    # 默认一键升级；仅检查加 --che
 
 - **升级**：任意命令后 stderr 可能提示新版（24h 缓存）；`upgrade` 默认执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills
 - list/count：`application/x-www-form-urlencoded`（`--body` JSON 会转为 form）
+- **统计口径**：库存页标题统计 → `item count`；商品档案（品牌/类目等）→ `service item item-query-count`（勿混用 `item count`）；详见 `skills/kuaimai-item/references/kuaimai-item-count-dimensions.md`
 - 鉴权：`accessToken` 须由用户提供（联系 ERP 管理员申请），Agent 不可代填；`auth login` 后请求头自动带 token；可用 `auth check` 探测
 - 多账号：`auth login --profile <name>` · `auth use <name>` · `auth list`
 - **列表翻页**（`pageable:true`，如 `stock-list`、`item-query-list-v2`）：
@@ -41,7 +42,7 @@ kuaimai-cli upgrade                    # 默认一键升级；仅检查加 --che
   - 全量：`--page-all`；Agent/管道续查：`--page-confirm yes`；限条数：`--page-limit N`
   - 规则详见 `skills/kuaimai-item/references/kuaimai-item-meta-execution.md`
 - 改标题：优先 `item update-title`；或 `get-detail` + jq + `item save`（见 `skills/kuaimai-item/references/`）
-- **无 shortcut**（如档案 V2 列表）：`service item item-query-list-v2 --body '{...}'`
+- **无 shortcut**（档案 V2）：列表 `service item item-query-list-v2`；统计 `service item item-query-count`（`pageNo`/`pageSize` 必填）
 - 原子 API 兜底：`service item <operation>`（operation 名如 `stock-list`，**非** `list`；见 [meta 定义规范](./docs/kuaimai-cli%20meta_data.json%20定义规范.md)）
 
 ## Skill

@@ -1,6 +1,6 @@
 ---
 name: kuaimai-item
-version: 2.0.0
+version: 2.0.1
 description: "快麦 ERP 商品（erp-items-core）：按标题搜索列表、统计数量、查详情、改标题。用户提到商品、SKU、标题、货号、列表、有多少、详情、改名时使用。"
 metadata:
   requires:
@@ -28,9 +28,12 @@ meta 执行规则（contentType / pageable / write / Schema）详见 [`reference
 
 ## 选哪个命令
 
+**统计 / 列表三接口区分**（库存 vs 商品档案）：必读 [`references/kuaimai-item-count-dimensions.md`](references/kuaimai-item-count-dimensions.md)。
+
 | 用户意图 | 命令 | 结果字段 |
 |----------|------|----------|
-| 有多少 / 几个 / 总数 / 统计 + 标题 | `item count` + `title` | `data.data.total` |
+| 有多少 + **标题**（库存页口径） | `item count` + `title` | `data.data.total` |
+| 有多少 + **品牌/类目/档案筛选** | `service item item-query-count` | `data.data.total` |
 | 列出 / 搜索 / 查找 / 有哪些 + 标题（库存页） | `item +list` + `title` | `data` 列表 |
 | 列出 / 搜索商品档案 V2 | `service item item-query-list-v2` | `data` 列表 |
 | 某商品详情 / sysItemId | `item get-detail` | `data[0]` |
@@ -46,6 +49,7 @@ meta 执行规则（contentType / pageable / write / Schema）详见 [`reference
 |----------------|-------------|-------|----------|------|---------------------|
 | `stock-list` | post_form | false | **true** | `/item/stock/queryList` | `item +list` / `item list` |
 | `stock-count` | post_form | false | false | `/item/stock/queryCount` | `item count` |
+| `item-query-count` | post_form | false | **true** | `/item/queryCount` | `service item item-query-count` |
 | `item-query-list-v2` | post_form | false | **true** | `/item/queryListV2` | `service item item-query-list-v2` |
 | `item-detail` | get_query | false | false | `/item/getItemDetail` | `item get-detail` |
 | `item-save` | post_json | **true** | false | `/item/saveItem` | `item save` |
@@ -63,10 +67,11 @@ meta 执行规则（contentType / pageable / write / Schema）详见 [`reference
 | [`update-title`](references/kuaimai-item-update-title.md) | 改标题（内部 get-detail → save 编排） |
 | [`save`](references/kuaimai-item-save.md) | 全量 body 保存（复杂字段修改） |
 
-**无 shortcut 的 meta 接口**（如商品档案 V2 列表）：
+**无 shortcut 的 meta 接口**（商品档案 V2）：
 
 | 命令 | 说明 |
 |------|------|
+| [`item-query-count`](references/kuaimai-item-query-count.md) | 商品档案总数（`service item item-query-count`） |
 | [`item-query-list-v2`](references/kuaimai-item-query-list-v2.md) | 商品档案列表 V2（`service item item-query-list-v2`） |
 
 **CRITICAL — 写操作（`save`、`update-title`）执行前 MUST 先用 Read 工具读取对应 references 文档**
@@ -135,7 +140,8 @@ kuaimai-cli api POST /item/stock/queryList            # 原始 HTTP 兜底
 
 ## 快速决策
 
-- 用户问「标题带 XX 有多少个」→ **`item count`** + `title`，禁止 `+list` 人工数
+- 用户问「标题带 XX 有多少个」（库存页）→ **`item count`** + `title`，禁止 `+list` 人工数
+- 用户问「品牌/类目/档案条件下有多少个」→ **`service item item-query-count`**，禁止 `item count` 或仅靠 list 的 `total`
 - 只有标题无 ID → 先 **`+list`**（库存页）或 **`service item item-query-list-v2`**（档案页）
 - 只改标题 → **`update-title`**，不要瘦身 `save`
 - **`item +list` 不支持 `--dry-run`**（查询接口）；`service item stock-list` 同样不支持
@@ -146,8 +152,13 @@ kuaimai-cli api POST /item/stock/queryList            # 原始 HTTP 兜底
 ## 典型场景
 
 ```bash
-# 统计标题含「春季」的商品数
+# 统计标题含「春季」的商品数（库存页）
 kuaimai-cli item count --body '{"title":"春季"}' --output json --no-color
+
+# 统计品牌为「洛可可」的商品档案总数
+kuaimai-cli service item item-query-count \
+  --body '{"brandNames":"洛可可","pageNo":1,"pageSize":1}' \
+  --output json --no-color
 
 # 搜索标题含 test 的商品（单页）
 kuaimai-cli item +list --body '{"title":"test","pageNo":1,"pageSize":50}' --output json --no-color

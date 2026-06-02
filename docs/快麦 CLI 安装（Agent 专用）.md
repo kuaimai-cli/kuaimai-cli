@@ -36,7 +36,9 @@ kuaimai-cli skill install
     ├── kuaimai-item-save.md
     ├── kuaimai-item-meta-execution.md    # meta 驱动规则、分页防护
     ├── kuaimai-item-service.md           # service 层兜底
-    └── kuaimai-item-query-list-v2.md     # 档案 V2 列表（无 shortcut）
+    ├── kuaimai-item-count-dimensions.md  # 库存/档案 统计与列表 三接口区分
+    ├── kuaimai-item-query-count.md       # 档案总数 item-query-count
+    └── kuaimai-item-query-list-v2.md     # 档案 V2 列表
 ```
 
 **Agent 使用约定**：
