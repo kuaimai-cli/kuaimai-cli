@@ -272,6 +272,7 @@ npm install -g @kuaimai-cli/cli@latest
 |------|------|
 | `auth check` 失败 / 401 | 重新 `auth login`；确认 token 未过期 |
 | `doctor` 中 Skill 未就绪 | `kuaimai-cli skill install` 或 `skill install --if-stale`（覆盖写入，一般无需手删缓存） |
+| `npx install` 显示「已安装跳过」但仍是旧版 | `kuaimai-cli upgrade` 或 `npm install -g @kuaimai-cli/cli@latest`（0.1.8+ 向导已自动比对版本） |
 | 不知道有新版本 | 日常用 CLI 即可（stderr 提示）；或 `kuaimai-cli upgrade` |
 | `permission denied: kuaimai-cli` | npm 全局入口 `run.js` 缺执行位；运行 `chmod +x $(npm root -g)/../bin/kuaimai-cli` 或重装 `@kuaimai-cli/cli@latest`（0.1.2+ 已自动修复） |
 | macOS 仍无法执行 Go 二进制 | `xattr -d com.apple.quarantine ~/.npm-global/lib/node_modules/@kuaimai-cli/cli/bin/kuaimai-cli` |

@@ -6,16 +6,19 @@ const { execFileSync, execFile } = require("child_process");
 const p = require("@clack/prompts");
 
 const PKG = "@kuaimai-cli/cli";
+const TARGET_VERSION = require("../package.json").version.replace(/-.*$/, "");
 const isWindows = process.platform === "win32";
 const { ensureExecutable, ensurePackageEntrypoints } = require("./permissions");
+const { normalizeVer, versionLess } = require("./version");
 
 const messages = {
   zh: {
     setup: "正在设置 kuaimai-cli...",
     step1: "正在安装 %s...",
-    step1Skip: "已安装 (v%s)，跳过",
+    step1Skip: "已是最新 (v%s)，跳过全局安装",
+    step1Upgrade: "发现旧版 npm 包 (v%s)，正在升级到 v%s...",
     step1Done: "已全局安装",
-    step1Fail: "全局安装失败。运行: npm install -g %s",
+    step1Fail: "全局安装失败。运行: npm install -g %s@%s",
     step2: "安装 AI Skills",
     step2Skip: "Skills 已安装，跳过",
     step2Spinner: "正在安装 Skills...",
@@ -26,14 +29,16 @@ const messages = {
     step3Done: "配置已初始化",
     step3Fail: "配置失败。运行: kuaimai-cli config init",
     step4: "登录",
-    step4Hint: "accessToken 须由用户提供。如尚未持有，请联系 ERP 管理员申请分配；拿到 token 后运行:\n  kuaimai-cli auth login \"<accessToken>\"",
-    step4Skip: "跳过登录。后续向 ERP 管理员申请 accessToken 后运行 kuaimai-cli auth login \"<accessToken>\"",
-    done: "安装完成！\n运行 kuaimai-cli auth status 验证；Agent 请阅读 docs/快麦 CLI 安装（Agent 专用）.md",
+    step4Hint:
+      'accessToken 须由用户提供。如尚未持有，请联系 ERP 管理员申请分配；拿到 token 后运行:\n  kuaimai-cli auth login "<accessToken>"',
+    step4Skip: '跳过登录。后续向 ERP 管理员申请 accessToken 后运行 kuaimai-cli auth login "<accessToken>"',
+    done:
+      "安装完成！\n运行 kuaimai-cli --version 确认版本；kuaimai-cli auth status 验证登录。",
     cancelled: "安装已取消",
     nonTtyHint:
       "请在终端完成以下步骤:\n" +
       "  （accessToken 须由用户提供，可联系 ERP 管理员申请分配）\n" +
-      "  kuaimai-cli auth login \"<accessToken>\"\n" +
+      '  kuaimai-cli auth login "<accessToken>"\n' +
       "  kuaimai-cli auth status --output json",
   },
 };
@@ -41,6 +46,10 @@ const messages = {
 function fmt(template, ...values) {
   let i = 0;
   return template.replace(/%s/g, () => values[i++] ?? "");
+}
+
+function forceInstall() {
+  return process.env.KUAIMAI_CLI_FORCE_INSTALL === "1";
 }
 
 function execCmd(cmd, args, opts) {
@@ -86,17 +95,41 @@ function goBinaryPath(root) {
   return path.join(root, "bin", "kuaimai-cli" + (isWindows ? ".exe" : ""));
 }
 
-function resolveCliRunner() {
-  const candidates = [
-    goBinaryPath(path.join(__dirname, "..")),
-    globalPackageRoot() ? goBinaryPath(globalPackageRoot()) : null,
-  ].filter(Boolean);
+function getBinaryVersion(binPath) {
+  if (!binPath || !fs.existsSync(binPath)) return null;
+  try {
+    ensureExecutable(binPath);
+    const out = runSilent(binPath, ["--version"], { timeout: 15000 });
+    return normalizeVer(out.toString());
+  } catch (_) {
+    return null;
+  }
+}
 
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      ensureExecutable(candidate);
-      return { cmd: candidate, argsPrefix: [] };
+function packageRoots() {
+  const roots = [path.join(__dirname, "..")];
+  const globalRoot = globalPackageRoot();
+  if (globalRoot && !roots.includes(globalRoot)) roots.push(globalRoot);
+  return roots;
+}
+
+function resolveCliRunner() {
+  let best = null;
+  let bestVer = "";
+
+  for (const root of packageRoots()) {
+    const candidate = goBinaryPath(root);
+    if (!fs.existsSync(candidate)) continue;
+    const ver = getBinaryVersion(candidate) || "";
+    if (!best || versionLess(bestVer, ver)) {
+      best = candidate;
+      bestVer = ver;
     }
+  }
+
+  if (best) {
+    ensureExecutable(best);
+    return { cmd: best, argsPrefix: [] };
   }
 
   const runJs = path.join(__dirname, "run.js");
@@ -113,33 +146,60 @@ function getGloballyInstalledVersion() {
   try {
     const out = runSilent("npm", ["list", "-g", PKG], { timeout: 15000 });
     const match = out.toString().match(/@(\d+\.\d+\.\d+[^\s]*)/);
-    return match ? match[1] : "unknown";
+    return match ? normalizeVer(match[1]) : null;
   } catch (_) {
     return null;
   }
 }
 
-function handleCancel(value, msg) {
-  if (p.isCancel(value)) {
-    p.cancel(msg.cancelled);
-    process.exit(0);
+function ensurePackageBinary(packageRoot) {
+  const installScript = path.join(packageRoot, "scripts", "install.js");
+  if (!fs.existsSync(installScript)) return null;
+
+  const bin = goBinaryPath(packageRoot);
+  const ver = getBinaryVersion(bin);
+  if (ver && !versionLess(ver, TARGET_VERSION) && !forceInstall()) {
+    return bin;
   }
-  return value;
+  execFileSync(process.execPath, [installScript], {
+    stdio: "inherit",
+    env: { ...process.env, KUAIMAI_CLI_RUN: "true" },
+    cwd: packageRoot,
+  });
+  return bin;
+}
+
+function ensureAllBinaries() {
+  for (const root of packageRoots()) {
+    ensurePackageBinary(root);
+  }
 }
 
 async function stepInstallGlobally(msg) {
   const installedVer = getGloballyInstalledVersion();
-  if (installedVer) {
+  const pkgSpec = `${PKG}@${TARGET_VERSION}`;
+
+  if (
+    installedVer &&
+    !forceInstall() &&
+    !versionLess(installedVer, TARGET_VERSION)
+  ) {
     p.log.info(fmt(msg.step1Skip, installedVer));
-    return;
+    return false;
   }
+
+  if (installedVer && versionLess(installedVer, TARGET_VERSION)) {
+    p.log.info(fmt(msg.step1Upgrade, installedVer, TARGET_VERSION));
+  }
+
   const s = p.spinner();
-  s.start(fmt(msg.step1, PKG));
+  s.start(fmt(msg.step1, pkgSpec));
   try {
-    await runSilentAsync("npm", ["install", "-g", PKG], { timeout: 120000 });
+    await runSilentAsync("npm", ["install", "-g", pkgSpec], { timeout: 120000 });
     s.stop(msg.step1Done);
+    return true;
   } catch (_) {
-    s.stop(fmt(msg.step1Fail, PKG));
+    s.stop(fmt(msg.step1Fail, PKG, TARGET_VERSION));
     process.exit(1);
   }
 }
@@ -153,11 +213,11 @@ async function skillsAlreadyInstalled() {
   }
 }
 
-async function stepInstallSkills(msg) {
+async function stepInstallSkills(msg, { refreshedCLI } = {}) {
   const s = p.spinner();
   s.start(msg.step2Spinner);
   try {
-    if (await skillsAlreadyInstalled()) {
+    if (!refreshedCLI && !forceInstall() && (await skillsAlreadyInstalled())) {
       s.stop(msg.step2Skip);
       return;
     }
@@ -186,43 +246,28 @@ async function stepAuthHint(msg) {
   p.log.info(msg.step4Hint);
 }
 
+async function runSetup(msg) {
+  const refreshedCLI = await stepInstallGlobally(msg);
+  for (const root of packageRoots()) {
+    ensurePackageEntrypoints(root);
+  }
+  ensureAllBinaries();
+  await stepInstallSkills(msg, { refreshedCLI: refreshedCLI || forceInstall() });
+  await stepConfigInit(msg);
+  await stepAuthHint(msg);
+}
+
 async function main() {
   const msg = messages.zh;
   const isInteractive = !!process.stdin.isTTY;
 
   if (isInteractive) {
     p.intro(msg.setup);
-    await stepInstallGlobally(msg);
-
-    ensurePackageEntrypoints(globalPackageRoot() || path.join(__dirname, ".."));
-
-    const runner = resolveCliRunner();
-    const goBin = runner.argsPrefix.length === 0 ? runner.cmd : goBinaryPath(globalPackageRoot() || path.join(__dirname, ".."));
-    if (!fs.existsSync(goBin)) {
-      execFileSync(process.execPath, [path.join(__dirname, "install.js")], {
-        stdio: "inherit",
-        env: { ...process.env, KUAIMAI_CLI_RUN: "true" },
-      });
-    }
-
-    await stepInstallSkills(msg);
-    await stepConfigInit(msg);
-    await stepAuthHint(msg);
+    await runSetup(msg);
     p.outro(msg.done);
   } else {
     console.log(msg.setup);
-    await stepInstallGlobally(msg);
-    ensurePackageEntrypoints(globalPackageRoot() || path.join(__dirname, ".."));
-    try {
-      runCLI(["skill", "install"], { timeout: 120000 });
-    } catch (_) {
-      // best effort
-    }
-    try {
-      runCLI(["config", "init"], { timeout: 15000 });
-    } catch (_) {
-      // best effort
-    }
+    await runSetup(msg);
     console.log(msg.nonTtyHint);
   }
 }

@@ -66,16 +66,23 @@ kuaimai-cli doctor --output json
 日常使用任意命令后，若 GitHub 有新版，CLI 会在 **stderr** 提示（24h 缓存，不污染 stdout JSON）。也可主动升级：
 
 ```shell
-# 默认：有新版则 npm 全局升级并同步 Skills（与飞书一致）
+# 推荐：一键升级（npm 全局包 + Go 二进制 + Skills）
 kuaimai-cli upgrade
+
+# 或重新走安装向导（0.1.8+ 会在全局版本偏旧时自动升级，不再「有包就跳过」）
+npx @kuaimai-cli/cli@latest install
 
 # 仅检查、不安装
 kuaimai-cli upgrade --check-only --output json
 ```
 
+**说明**：`~/.kuaimai-cli/` 仅存配置与缓存，**不会**阻止 CLI 升级。若 `npx install` 曾提示「已安装 (v0.1.0)，跳过」而版本未变，请用上面 `upgrade` / 重装；`0.1.8` 起向导会对比 npm 包版本并自动 `npm install -g @kuaimai-cli/cli@<目标版本>`。
+
 CLI 版本变更后，会在后台尝试将 `kuaimai-shared`、`kuaimai-item` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。也可手动：
 
 ```shell
+kuaimai-cli skill install
+# 或仅在 Release/CLI 变化时更新
 kuaimai-cli skill install --if-stale
 ```
 
@@ -83,7 +90,22 @@ kuaimai-cli skill install --if-stale
 |----------|------|
 | `KUAIMAI_CLI_SKIP_UPDATE_CHECK=1` | 禁用「新版本」stderr 提示 |
 | `KUAIMAI_CLI_SKIP_SKILL_SYNC=1` | 禁用 CLI 版本变更后的 Skill 自动同步 |
+| `KUAIMAI_CLI_FORCE_INSTALL=1` | 安装向导强制重装全局包与 Skills（忽略「已安装」跳过） |
 
 升级完成后请 **重新打开终端** 并执行 `kuaimai-cli --version` 确认；必要时重开 Agent 会话以加载最新 Skill。
+
+### 升级仍异常时的兜底（慎用）
+
+仅当 `upgrade` / `npx install` 后 `kuaimai-cli --version` 仍不对，或 PATH 指向旧二进制时：
+
+```shell
+npm install -g @kuaimai-cli/cli@latest
+hash -r   # zsh：刷新命令缓存
+which kuaimai-cli
+kuaimai-cli --version
+kuaimai-cli skill install
+```
+
+**不要**删除 `~/.kuaimai-cli/`（会丢失 `config.yaml` 与 token）。无需 `skill install all`（无此参数；无参数即安装默认 Skills）。
 
 安装 Skill 后请 **重新打开 Agent 会话**。更多命令与使用说明，可查阅 [AGENTS.md](../AGENTS.md) 与 [系统架构与飞书对标说明](./系统架构与飞书对标说明.md)。

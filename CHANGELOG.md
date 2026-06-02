@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- **npm 安装向导**：全局已存在旧版 `@kuaimai-cli/cli` 时不再一律跳过；对比向导包版本后自动 `npm install -g @kuaimai-cli/cli@<版本>`，并刷新各安装目录下 Go 二进制；CLI 升级后强制重跑 `skill install`
+- 环境变量 `KUAIMAI_CLI_FORCE_INSTALL=1` 可强制重装全局包与 Skills
+
 ### Added
 
 - **版本感知与一键升级（对标飞书 lark-cli）**：

@@ -289,9 +289,10 @@ kuaimai-cli upgrade
 
 kuaimai-cli upgrade --check-only --output json
 
-# 2. 等价手动路径（upgrade 内部即调用 npm）
+# 2. 等价手动路径（upgrade 内部即调用 npm install -g @latest）
 
 npx @kuaimai-cli/cli@latest install
+# 0.1.8+：向导对比全局 npm 版本，旧版会 npm install -g @kuaimai-cli/cli@<向导版本>，不再「有 0.1.0 就跳过」
 kuaimai-cli skill install --if-stale
 
 # 3. 本地源码更新（未发版调试用）
@@ -301,19 +302,22 @@ git pull origin main
 make build
 cp ./kuaimai-cli ~/bin/kuaimai-cli
 
-# 4. 全局异常清理（仅当 skill install / --if-stale 仍异常时使用）
+# 4. 全局异常（版本仍卡在旧号）
 
-# 优先：覆盖重装（不删其它 skill）
+npm install -g @kuaimai-cli/cli@latest
+kuaimai-cli --version
 kuaimai-cli skill install
-# 或
-kuaimai-cli skill install --if-stale
 
-# 兜底：手动删除各 Agent 下 kuaimai-* 后再装（慎用）
-# rm -rf ~/.agents/skills/kuaimai-* ~/.cursor/skills/kuaimai-* ...
+# 强制重装向导（不删 ~/.kuaimai-cli 配置）
+KUAIMAI_CLI_FORCE_INSTALL=1 npx @kuaimai-cli/cli@latest install
 
-npx @kuaimai-cli/cli@latest install
+# 5. 仅 Skill 异常：覆盖重装（勿删 ~/.kuaimai-cli）
 kuaimai-cli skill install
 kuaimai-cli doctor --output json
+
+# 6. 最后兜底：删各 Agent 下 kuaimai-* 后再装（勿删 ~/.kuaimai-cli）
+# rm -rf ~/.agents/skills/kuaimai-* ~/.cursor/skills/kuaimai-* ...
+# npx @kuaimai-cli/cli@latest install
 
 ---
 
