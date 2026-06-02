@@ -6,6 +6,13 @@
 
 ### Added
 
+- **版本感知与一键升级（对标飞书 lark-cli）**：
+  - 任意命令结束后 stderr 提示新版本（24h 缓存，`~/.kuaimai-cli/version-check.json`）
+  - `kuaimai-cli upgrade` 默认执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills；`--check-only` 仅检查
+  - `skill install --if-stale`：仅在 Release/CLI 变化或未安装时更新
+  - CLI 版本变更后后台自动同步 Skills（`~/.kuaimai-cli/skill-sync.json`）
+  - 环境变量：`KUAIMAI_CLI_SKIP_UPDATE_CHECK`、`KUAIMAI_CLI_SKIP_SKILL_SYNC`
+
 - **meta_data.json v1.6.0**：`item` 域 **1157** 个 operation（erp-items-core `/item` Controller 全量注册）
 - **`internal/pagination`**：`--page-all` 海量数据防护（500/1000 条阈值、交互 `[y/N]`、分片合并）
 - 全局参数 **`--page-limit`**、**`--page-confirm`**（`prompt` | `yes` | `no`）
@@ -14,7 +21,7 @@
 - `auth check`：探测 accessToken 与 API 连通性
 - `auth list` / `auth use` / `auth login --profile`：多账号 profile
 - `item update-title`：get-detail 合并后 save，简化改标题
-- `kuaimai-cli upgrade`：对比 GitHub Release 版本
+- `kuaimai-cli upgrade`：对比 GitHub Release；**后续版本**默认 npm 一键升级（见 Unreleased）
 - `kuaimai-cli doctor`：安装自检
 - `tests/cli_e2e`：冒烟 E2E（mock HTTP）
 - 根目录 `README.md`、CI workflow

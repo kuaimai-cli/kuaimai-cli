@@ -54,7 +54,7 @@ kuaimai-cli/
 │   ├── root.go             # 注册各子命令
 │   ├── authcmd/            # login、check、list、use…
 │   ├── doctorcmd/          # 安装自检
-│   └── upgradecmd/         # 版本查询
+│   └── upgradecmd/         # 版本检查与一键升级（默认 npm 安装）
 ├── internal/
 │   ├── config/             # template.go + Init/Get/Set
 │   ├── auth/
@@ -98,7 +98,7 @@ kuaimai-cli schema
 kuaimai-cli service item <operation> [--body '{}']
 
 kuaimai-cli skill list | skill install [name...]
-kuaimai-cli upgrade | doctor
+kuaimai-cli upgrade [--check-only] | doctor
 kuaimai-cli completion bash|zsh|powershell
 ```
 
@@ -221,7 +221,7 @@ kuaimai-cli schema --output json
 | 能力 | 状态 |
 |------|------|
 | E2E 冒烟 `tests/cli_e2e` | ✅ |
-| `upgrade` / `doctor` | ✅ |
+| `upgrade` / `doctor` | ✅（`upgrade` 默认 npm 升级；`--check-only` 仅检查） |
 | 多账号 `auth list` / `auth use` / `--profile` | ✅ |
 | `item update-title` | ✅ |
 | `auth check` | ✅ |
@@ -253,7 +253,7 @@ make build
 
 **已对齐**：分层 · 三级命令 · shortcuts 手写 · registry/service · 密钥链 · 结构化 stdout · Skill 目录（含 `references/`）· csv/ndjson  
 
-**差异**：业务域体量（当前 1 域 vs 飞书 18+）· 鉴权（accessToken vs OAuth）· E2E/升级待补齐  
+**差异**：业务域体量（当前 1 域 vs 飞书 18+）· 鉴权（accessToken vs OAuth）· 更多业务域 shortcuts 待扩展  
 
 **专属优势**：贴合 erp-items-core 真实路径、商品标题场景端到端可脚本化、维护面小  
 

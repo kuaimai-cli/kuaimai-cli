@@ -11,7 +11,7 @@
 | 业务域 | 商品 list / count / 详情 / 改标题（`item` shortcuts） |
 | 元数据 | `meta_data.json` **v1.6.0**，**1157** 个 `/item` 接口（`schema` / `service item`） |
 | 分页 | `--page-all` · `--page-limit` · `--page-confirm`（海量数据防护） |
-| Agent | `skill install` 安装 `kuaimai-shared` + `kuaimai-item`（含 `references/`） |
+| Agent | `skill install` / `--if-stale`；`upgrade` 默认一键升级 + stderr 新版本提示 |
 
 ## 用户安装（推荐）
 
@@ -44,19 +44,24 @@ kuaimai-cli item +list \
 ## 升级
 
 ```bash
-kuaimai-cli upgrade --output json
+kuaimai-cli upgrade                        # 默认：有新版则 npm 全局升级并同步 Skills
+kuaimai-cli upgrade --check-only --output json
 npx @kuaimai-cli/cli@latest install
 # 或
 npm install -g @kuaimai-cli/cli@latest
 ```
 
-`upgrade` **仅检查版本**，不会自动替换二进制；须重新 `install` 或重装 npm 包。
+任意命令结束后（24h 缓存）若有新版会在 **stderr** 提示；`upgrade` 默认会执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills。仅检查请加 `--check-only`。禁用提示：`KUAIMAI_CLI_SKIP_UPDATE_CHECK=1`。
 
-Skill 有更新时：
+Skill 有更新时（覆盖写入，无需手删各 Agent 缓存）：
 
 ```bash
+kuaimai-cli skill install --if-stale
+# 或强制重装
 kuaimai-cli skill install
 ```
+
+禁用 Skill 自动同步：`KUAIMAI_CLI_SKIP_SKILL_SYNC=1`
 
 ## 全局安装
 

@@ -208,7 +208,8 @@ kuaimai-cli service item stock-list \
 
 ```bash
 kuaimai-cli --version
-kuaimai-cli upgrade --output json    # 检查 GitHub 是否有新版本
+kuaimai-cli upgrade                 # 默认：有新版则升级并同步 Skills
+kuaimai-cli upgrade --check-only --output json
 kuaimai-cli doctor --output json
 ```
 
@@ -243,15 +244,23 @@ kuaimai-cli item +list --body '{"pageNo":1,"pageSize":100}' --output ndjson
 
 ## 升级
 
-```bash
-# 查看是否有新版本
-kuaimai-cli upgrade --output json
+对标飞书 lark-cli：**用着就知道** + **默认一键升级**。
 
-# 升级到最新（与飞书类似：重新安装）
+```bash
+# 默认：对比 GitHub Release，有新版则 npm 全局安装并同步 Skills
+kuaimai-cli upgrade
+
+# 仅检查、不安装
+kuaimai-cli upgrade --check-only --output json
+
+# 等价手动路径
 npx @kuaimai-cli/cli@latest install
-# 或
 npm install -g @kuaimai-cli/cli@latest
 ```
+
+- 任意命令结束后，若有新版会在 **stderr** 提示（24h 缓存，见 `~/.kuaimai-cli/version-check.json`）
+- Skill：`skill install --if-stale`；CLI 版本变更后会尝试自动同步（`~/.kuaimai-cli/skill-sync.json`）
+- 禁用提示：`KUAIMAI_CLI_SKIP_UPDATE_CHECK=1`；禁用 Skill 自动同步：`KUAIMAI_CLI_SKIP_SKILL_SYNC=1`
 
 也可从 [Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载新版本二进制覆盖安装。
 
@@ -262,7 +271,8 @@ npm install -g @kuaimai-cli/cli@latest
 | 现象 | 处理 |
 |------|------|
 | `auth check` 失败 / 401 | 重新 `auth login`；确认 token 未过期 |
-| `doctor` 中 Skill 未就绪 | 执行 `kuaimai-cli skill install`；若仅有 `SKILL.md` 无 `references/`，需重装 |
+| `doctor` 中 Skill 未就绪 | `kuaimai-cli skill install` 或 `skill install --if-stale`（覆盖写入，一般无需手删缓存） |
+| 不知道有新版本 | 日常用 CLI 即可（stderr 提示）；或 `kuaimai-cli upgrade` |
 | `permission denied: kuaimai-cli` | npm 全局入口 `run.js` 缺执行位；运行 `chmod +x $(npm root -g)/../bin/kuaimai-cli` 或重装 `@kuaimai-cli/cli@latest`（0.1.2+ 已自动修复） |
 | macOS 仍无法执行 Go 二进制 | `xattr -d com.apple.quarantine ~/.npm-global/lib/node_modules/@kuaimai-cli/cli/bin/kuaimai-cli` |
 | checksum 校验失败 | 重打 tag 后须重新 `npm publish`，使包内 `checksums.txt` 与 Release 一致 |

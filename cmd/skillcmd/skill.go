@@ -41,19 +41,42 @@ func listCmd() *cobra.Command {
 
 func installCmd() *cobra.Command {
 	var repo, gitRef string
+	var ifStale bool
 	c := &cobra.Command{
 		Use:   "install [name...]",
 		Short: "从 GitHub 安装 Skill 到各 Agent 目录（无参数时安装 kuaimai-shared、kuaimai-item）",
+		Long:  "覆盖写入各 Agent 的 skill 目录（不删除其它 skill）。--if-stale 时仅在 Release/CLI 版本变化或未安装时更新。",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := cmdutil.NewFactory()
 			if err != nil {
 				return err
 			}
+			opts := skill.InstallOptions{Repo: repo, Ref: gitRef}
+
+			if ifStale && len(args) == 0 {
+				updated, results, err := skill.InstallIfStale(opts)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					return err
+				}
+				if !updated {
+					return f.Printer().Success(map[string]any{
+						"message": "Skills 已是最新，无需更新",
+						"stale":   false,
+					})
+				}
+				return f.Printer().Success(map[string]any{
+					"message": "Skills 已更新（--if-stale）",
+					"stale":   true,
+					"count":   len(results),
+					"skills":  results,
+				})
+			}
+
 			names := args
 			if len(names) == 0 {
 				names = skill.DefaultSkillNames
 			}
-			opts := skill.InstallOptions{Repo: repo, Ref: gitRef}
 			var results []skill.InstallResult
 			for _, name := range names {
 				res, err := skill.Install(name, opts)
@@ -71,6 +94,7 @@ func installCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&repo, "repo", skill.DefaultGitHubRepo(), "GitHub 仓库（owner/repo）")
-	c.Flags().StringVar(&gitRef, "ref", "main", "GitHub 分支或 tag")
+	c.Flags().StringVar(&gitRef, "ref", "main", "GitHub 分支或 tag（--if-stale 时默认用最新 Release tag）")
+	c.Flags().BoolVar(&ifStale, "if-stale", false, "仅在未安装或 Release/CLI 版本变化时安装默认 Skills")
 	return c
 }

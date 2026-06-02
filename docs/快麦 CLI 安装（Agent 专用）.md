@@ -59,6 +59,31 @@ kuaimai-cli auth status
 kuaimai-cli doctor --output json
 ```
 
-`doctor` 会检查 `kuaimai-item` Skill 是否已安装且含 `references/`；若缺失请重新执行 `skill install`。
+`doctor` 会检查 `kuaimai-item` Skill 是否已安装且含 `references/`；若缺失请执行 `kuaimai-cli skill install` 或 `kuaimai-cli skill install --if-stale`（覆盖写入，无需手动删除各 Agent 缓存目录）。
+
+## 第 6 步 升级与 Skill 同步（对标飞书 lark-cli）
+
+日常使用任意命令后，若 GitHub 有新版，CLI 会在 **stderr** 提示（24h 缓存，不污染 stdout JSON）。也可主动升级：
+
+```shell
+# 默认：有新版则 npm 全局升级并同步 Skills（与飞书一致）
+kuaimai-cli upgrade
+
+# 仅检查、不安装
+kuaimai-cli upgrade --check-only --output json
+```
+
+CLI 版本变更后，会在后台尝试将 `kuaimai-shared`、`kuaimai-item` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。也可手动：
+
+```shell
+kuaimai-cli skill install --if-stale
+```
+
+| 环境变量 | 作用 |
+|----------|------|
+| `KUAIMAI_CLI_SKIP_UPDATE_CHECK=1` | 禁用「新版本」stderr 提示 |
+| `KUAIMAI_CLI_SKIP_SKILL_SYNC=1` | 禁用 CLI 版本变更后的 Skill 自动同步 |
+
+升级完成后请 **重新打开终端** 并执行 `kuaimai-cli --version` 确认；必要时重开 Agent 会话以加载最新 Skill。
 
 安装 Skill 后请 **重新打开 Agent 会话**。更多命令与使用说明，可查阅 [AGENTS.md](../AGENTS.md) 与 [系统架构与飞书对标说明](./系统架构与飞书对标说明.md)。

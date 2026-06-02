@@ -29,6 +29,15 @@ type CheckResult struct {
 	Hint        string `json:"hint,omitempty"`
 }
 
+// LatestReleaseTag returns the newest GitHub release tag (e.g. v0.1.6).
+func LatestReleaseTag(repo string) (string, error) {
+	rel, err := fetchLatestRelease(repo)
+	if err != nil {
+		return "", err
+	}
+	return rel.TagName, nil
+}
+
 // CheckLatest fetches the newest release tag from GitHub.
 func CheckLatest(repo string) (*CheckResult, error) {
 	if strings.TrimSpace(repo) == "" {

@@ -105,11 +105,13 @@ kuaimai-cli skill list --output json
 
 # 自检与版本
 kuaimai-cli doctor --output json
-kuaimai-cli upgrade
+kuaimai-cli upgrade                # 默认：有新版则 npm 升级 + Skills 同步
+kuaimai-cli upgrade --check-only --output json
+kuaimai-cli skill install --if-stale
 kuaimai-cli schema --output json   # 全量 meta（1157 operations）
 ```
 
-已安装路径：`~/.agents/skills/<name>/`（同时写入 `~/.cursor/skills` 等 Agent 目录）。安装 Skill 后 **重新打开 Agent 会话** 以加载最新内容。
+已安装路径：`~/.agents/skills/<name>/`（同时写入 `~/.cursor/skills` 等 Agent 目录）。`skill install` **覆盖写入**对应目录，无需手删缓存。任意命令后若有新版会在 **stderr** 提示（24h 缓存）。安装或升级 Skill 后 **重新打开 Agent 会话** 以加载最新内容。
 
 ## --page-all 安全（Agent 必读）
 
@@ -136,7 +138,8 @@ kuaimai-cli schema --output json   # 全量 meta（1157 operations）
 | 提示未登录 / 401 | `auth status` → 提示用户向 ERP 管理员申请 accessToken → 引导 `auth login` |
 | `ok: false` 且无网络错误 | 读 `error`、`hint`；必要时加 `--verbose` 重试 |
 | 命令找不到 | 检查 `KUAIMAI_CLI` / PATH / `npx @kuaimai-cli/cli` 是否已安装 |
-| Skill 行为不符合预期 | `skill install` 重装，并重开 Agent；`kuaimai-item` 需含 `references/` 目录 |
+| Skill 行为不符合预期 | `skill install` 或 `skill install --if-stale` 覆盖重装，并重开 Agent；`kuaimai-item` 需含 `references/` |
+| CLI 版本过旧 | `kuaimai-cli upgrade`（默认一键）；或 `npx @kuaimai-cli/cli@latest install` |
 
 ## 域 Skill 路由
 

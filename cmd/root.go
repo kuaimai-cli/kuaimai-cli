@@ -17,6 +17,8 @@ import (
 	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/output"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/pagination"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/skill"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/upgrade"
 	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
 	"github.com/kuaimai-cli/kuaimai-cli/shortcuts/item"
 	"github.com/spf13/cobra"
@@ -85,6 +87,10 @@ func init() {
 		}
 		resolveOutputFormat(cmd)
 		resolveColor(cmd)
+	}
+	rootCmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
+		upgrade.MaybeNotify(cmd)
+		skill.MaybeSyncOnCLIVersionChange(cmd)
 	}
 
 	configcmd.Register(rootCmd)

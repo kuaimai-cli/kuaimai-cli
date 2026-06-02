@@ -71,6 +71,7 @@ kuaimai-cli auth login "<accessToken>"
 kuaimai-cli skill install
 kuaimai-cli auth check --output json
 kuaimai-cli doctor --output json
+kuaimai-cli upgrade   # 默认一键升级；仅检查: --check-only
 ```
 
 ---

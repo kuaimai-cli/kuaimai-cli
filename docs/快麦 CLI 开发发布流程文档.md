@@ -1,6 +1,29 @@
 全部命令无占位、可直接复制运行｜开发 / 推送 / PR / 发版 / 重置 / 用户安装 全流程闭环
 详细规范见：开发发布流程
 
+
+# 1. 清理所有失败的旧Tag（v0.1.4/v0.1.5）
+git push origin --delete v0.1.4
+git push origin --delete v0.1.5
+git tag -d v0.1.4
+git tag -d v0.1.5
+
+# 2. 同步最新代码，提交配置修改
+git add -A
+git reset -- scripts/generate_meta/__pycache__/ scripts/filter_meta/__pycache__/
+git commit -m "fix: 修复goreleaser v2兼容报错，适配vendor编译"
+git push origin main
+
+# 3. 全新升级版本，正式发版
+git checkout main
+git pull origin main
+npm view @kuaimai-cli/cli version
+git tag v0.1.6
+git push origin v0.1.6
+
+
+
+
 ---
 
 一、本地开发编译 & 自测（开发人员专用）
@@ -258,14 +281,18 @@ git push origin v0.1.5
 
 五、开发人员本机更新 & 异常重置
 
-# 1. 检测是否有新版本
+# 1. 一键升级（默认：检查 + npm 全局安装 + Skills 同步）
 
-kuaimai-cli upgrade --output json
+kuaimai-cli upgrade
 
-# 2. 在线重装最新正式版
+# 仅检查、不安装
+
+kuaimai-cli upgrade --check-only --output json
+
+# 2. 等价手动路径（upgrade 内部即调用 npm）
 
 npx @kuaimai-cli/cli@latest install
-kuaimai-cli skill install
+kuaimai-cli skill install --if-stale
 
 # 3. 本地源码更新（未发版调试用）
 
@@ -274,15 +301,15 @@ git pull origin main
 make build
 cp ./kuaimai-cli ~/bin/kuaimai-cli
 
-# 4. 全局异常清理（版本错乱/缓存残留必杀）
+# 4. 全局异常清理（仅当 skill install / --if-stale 仍异常时使用）
 
-rm -rf ~/.agents/skills/kuaimai-*
-rm -rf ~/.cursor/skills/kuaimai-*
-rm -rf ~/.claude/skills/kuaimai-*
-rm -rf ~/.codex/skills/kuaimai-*
-rm -rf ~/.windsurf/skills/kuaimai-*
+# 优先：覆盖重装（不删其它 skill）
+kuaimai-cli skill install
+# 或
+kuaimai-cli skill install --if-stale
 
-# 清理后重装验收
+# 兜底：手动删除各 Agent 下 kuaimai-* 后再装（慎用）
+# rm -rf ~/.agents/skills/kuaimai-* ~/.cursor/skills/kuaimai-* ...
 
 npx @kuaimai-cli/cli@latest install
 kuaimai-cli skill install
@@ -308,11 +335,12 @@ kuaimai-cli doctor --output json
 # 3. 权限校验 & 技能同步
 
 kuaimai-cli auth check --output json
-kuaimai-cli skill install
+kuaimai-cli skill install --if-stale
 
-# 4. 检测新版本
+# 4. 升级（默认一键；任意命令后 stderr 也可能提示新版）
 
-kuaimai-cli upgrade --output json
+kuaimai-cli upgrade
+# kuaimai-cli upgrade --check-only --output json
 
 ---
 

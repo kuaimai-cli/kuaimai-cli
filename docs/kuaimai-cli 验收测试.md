@@ -282,12 +282,15 @@ cat ~/.kuaimai-cli/audit.log | tail -5
 go test ./...
 go test ./tests/cli_e2e/...
 kuaimai-cli doctor --output json
-kuaimai-cli upgrade --output json
+kuaimai-cli upgrade --check-only --output json
+kuaimai-cli upgrade   # 有新版时：npm 全局安装 + skill 同步（需网络与 npm）
 ```
 
 - [ ] 单元测试与 E2E 冒烟通过
 - [ ] `doctor` 输出 `ready` 与 `next` 步骤
-- [ ] `upgrade` 可查询 GitHub Release（需网络）
+- [ ] `upgrade --check-only` 可查询 GitHub Release（需网络）
+- [ ] 任意命令后 stderr 可出现新版本提示（24h 内可能因缓存不重复）
+- [ ] `skill install --if-stale` 在 Release 变化时可更新 Skills
 
 ### 6.2 鉴权增强
 
@@ -310,7 +313,7 @@ kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run -
 
 ### 6.4 仍规划
 
-扩展更多 curated shortcuts · 自动替换二进制升级 · `--page-delay` · 单 op `schema`
+扩展更多 curated shortcuts · `--page-delay` · 单 op `schema`
 
 ---
 

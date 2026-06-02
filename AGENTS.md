@@ -29,9 +29,10 @@ kuaimai-cli item get-detail --sys-item-id <id>
 kuaimai-cli item save --body '{...}' --dry-run
 kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run
 kuaimai-cli doctor
-kuaimai-cli upgrade
+kuaimai-cli upgrade                    # 默认一键升级；仅检查加 --check-only
 ```
 
+- **升级**：任意命令后 stderr 可能提示新版（24h 缓存）；`upgrade` 默认执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills
 - list/count：`application/x-www-form-urlencoded`（`--body` JSON 会转为 form）
 - 鉴权：`accessToken` 须由用户提供（联系 ERP 管理员申请），Agent 不可代填；`auth login` 后请求头自动带 token；可用 `auth check` 探测
 - 多账号：`auth login --profile <name>` · `auth use <name>` · `auth list`
@@ -48,6 +49,7 @@ kuaimai-cli upgrade
 ```bash
 kuaimai-cli skill list
 kuaimai-cli skill install                  # kuaimai-shared + kuaimai-item（整目录含 references/）
+kuaimai-cli skill install --if-stale       # 仅在 Release/CLI 变化或未安装时更新
 kuaimai-cli skill install kuaimai-item     # 安装单个 Skill
 ```
 

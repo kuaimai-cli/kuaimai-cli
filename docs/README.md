@@ -50,7 +50,7 @@
 - **鉴权**：`auth login|logout|status|check|list|use`，多 profile
 - **输出**：`--output table|json|csv|ndjson`；`--dry-run` · `--verbose` · `--no-color`
 - **元数据**：`schema` 全量自省 · `service item <op>` 零代码驱动（required 校验 + Schema 默认值）
-- **Agent**：`doctor` · `upgrade` · `skill install`（GitHub 整目录）· E2E（`tests/cli_e2e`）
+- **Agent**：`doctor` · `upgrade`（默认一键升级 + stderr 新版本提示）· `skill install` / `--if-stale`（GitHub 整目录覆盖写入）· E2E（`tests/cli_e2e`）
 - **默认 API**：`https://erp1.superboss.cc/`
 
 ### 框架状态
