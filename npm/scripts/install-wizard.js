@@ -20,19 +20,19 @@ const messages = {
     step2Skip: "Skills 已安装，跳过",
     step2Spinner: "正在安装 Skills...",
     step2Done: "Skills 已安装",
-    step2Fail: "Skills 安装失败。运行: kuaimai-cli skill install-all",
+    step2Fail: "Skills 安装失败。运行: kuaimai-cli skill install",
     step3: "正在初始化配置...",
     step3Skip: "跳过配置",
     step3Done: "配置已初始化",
     step3Fail: "配置失败。运行: kuaimai-cli config init",
     step4: "登录",
-    step4Hint: "请从 ERP 浏览器 DevTools → Network 复制 accessToken，然后运行:\n  kuaimai-cli auth login \"<accessToken>\"",
-    step4Skip: "跳过登录。后续运行 kuaimai-cli auth login \"<accessToken>\"",
-    done: "安装完成！\n运行 kuaimai-cli auth status 验证；Agent 请阅读 docs/kuaimai-cli-agent-installation-guide.md",
+    step4Hint: "accessToken 须由用户提供。如尚未持有，请联系 ERP 管理员申请分配；拿到 token 后运行:\n  kuaimai-cli auth login \"<accessToken>\"",
+    step4Skip: "跳过登录。后续向 ERP 管理员申请 accessToken 后运行 kuaimai-cli auth login \"<accessToken>\"",
+    done: "安装完成！\n运行 kuaimai-cli auth status 验证；Agent 请阅读 docs/快麦 CLI 安装（Agent 专用）.md",
     cancelled: "安装已取消",
     nonTtyHint:
       "请在终端完成以下步骤:\n" +
-      "  kuaimai-cli config init\n" +
+      "  （accessToken 须由用户提供，可联系 ERP 管理员申请分配）\n" +
       "  kuaimai-cli auth login \"<accessToken>\"\n" +
       "  kuaimai-cli auth status --output json",
   },
@@ -161,7 +161,7 @@ async function stepInstallSkills(msg) {
       s.stop(msg.step2Skip);
       return;
     }
-    runCLI(["skill", "install-all"], { timeout: 120000 });
+    runCLI(["skill", "install"], { timeout: 120000 });
     s.stop(msg.step2Done);
   } catch (_) {
     s.stop(msg.step2Fail);
@@ -214,7 +214,7 @@ async function main() {
     await stepInstallGlobally(msg);
     ensurePackageEntrypoints(globalPackageRoot() || path.join(__dirname, ".."));
     try {
-      runCLI(["skill", "install-all"], { timeout: 120000 });
+      runCLI(["skill", "install"], { timeout: 120000 });
     } catch (_) {
       // best effort
     }

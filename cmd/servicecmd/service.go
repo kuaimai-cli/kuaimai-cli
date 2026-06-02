@@ -3,14 +3,16 @@ package servicecmd
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
-	"github.com/kuaimai/kuaimai-cli/internal/client"
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/core"
-	"github.com/kuaimai/kuaimai-cli/internal/registry"
-	"github.com/kuaimai/kuaimai-cli/shortcuts/common"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/client"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/registry"
+	"github.com/kuaimai-cli/kuaimai-cli/shortcuts/common"
 	"github.com/spf13/cobra"
 )
 
@@ -24,26 +26,33 @@ func Register(root *cobra.Command) {
 		Use:   "service",
 		Short: "元数据驱动的 API 子命令",
 	}
-	for _, svc := range meta.Services {
-		cmd.AddCommand(serviceGroup(svc))
+	for _, svcName := range meta.ServiceNames() {
+		svc := meta.Services[svcName]
+		cmd.AddCommand(serviceGroup(svcName, svc))
 	}
 	root.AddCommand(cmd)
 }
 
-func serviceGroup(svc registry.Service) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   svc.Name,
-		Short: svc.Description,
+func serviceGroup(svcName string, svc registry.Service) *cobra.Command {
+	short := svc.Summary
+	if short == "" {
+		short = svc.Description
 	}
-	for _, op := range svc.Operations {
+	cmd := &cobra.Command{
+		Use:   svcName,
+		Short: short,
+	}
+	for _, opName := range svc.OperationNames() {
+		op := svc.Operations[opName]
 		cmd.AddCommand(operationCmd(op))
 	}
 	return cmd
 }
 
 func operationCmd(op registry.Operation) *cobra.Command {
-	short := fmt.Sprintf("%s %s — %s", op.Method, op.Path, op.Description)
+	short := fmt.Sprintf("%s %s — %s", op.Method, op.Path, op.Summary)
 	var bodyJSON string
+	defaultBody := op.DefaultBodyJSON()
 	c := &cobra.Command{
 		Use:   op.Name,
 		Short: short,
@@ -51,13 +60,17 @@ func operationCmd(op registry.Operation) *cobra.Command {
 			return runOperation(op, bodyJSON)
 		},
 	}
-	if op.Write {
-		c.Flags().StringVar(&bodyJSON, "body", "{}", "请求体 JSON")
+	if op.NeedsBody() {
+		c.Flags().StringVar(&bodyJSON, "body", defaultBody, "请求体 JSON（post_form 会转为表单；get_query 会转为 URL 查询参数）")
 	}
 	return c
 }
 
 func runOperation(op registry.Operation, bodyJSON string) error {
+	if core.Ctx.DryRun && !op.Write {
+		return fmt.Errorf("操作 %s 为查询接口，不支持 --dry-run（请使用 write:true 的写接口）", op.Name)
+	}
+
 	f, err := cmdutil.NewFactory()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -66,30 +79,78 @@ func runOperation(op registry.Operation, bodyJSON string) error {
 	r := common.NewRunner(f)
 	method := strings.ToUpper(op.Method)
 
-	if op.Write || client.IsWriteMethod(method) {
+	switch op.ContentType {
+	case registry.ContentTypeGetQuery:
+		return runGetQuery(r, op, method, bodyJSON)
+	case registry.ContentTypePostForm, registry.ContentTypePostJSON:
 		body, err := common.ParseBodyJSON(bodyJSON)
 		if err != nil {
 			return err
+		}
+		if err := op.ValidateRequestBody(body); err != nil {
+			return err
+		}
+		pageAll := op.Pageable && core.Ctx.PageAll
+		if core.Ctx.PageAll && !op.Pageable {
+			fmt.Fprintln(os.Stderr, "提示: 该操作 pageable=false，已忽略 --page-all")
 		}
 		return r.ExecuteWrite(context.Background(), common.WriteOptions{
 			Method:      method,
 			Path:        op.Path,
 			Body:        body,
-			FormEncoded: op.FormEncoded,
+			FormEncoded: op.FormEncoded(),
+			PageAll:     &pageAll,
 		})
+	default:
+		return fmt.Errorf("未知 contentType: %s", op.ContentType)
 	}
+}
 
-	if op.Paginated || core.Ctx.PageAll {
-		return r.ExecuteList(context.Background(), common.ListOptions{
-			Method: method,
-			Path:   op.Path,
-		})
+func runGetQuery(r *common.Runner, op registry.Operation, method, bodyJSON string) error {
+	path := op.Path
+	if strings.TrimSpace(bodyJSON) != "" && bodyJSON != "{}" {
+		body, err := common.ParseBodyJSON(bodyJSON)
+		if err != nil {
+			return err
+		}
+		if err := op.ValidateRequestBody(body); err != nil {
+			return err
+		}
+		q := url.Values{}
+		for k, v := range body {
+			q.Set(k, formatQueryValue(v))
+		}
+		if enc := q.Encode(); enc != "" {
+			path = op.Path + "?" + enc
+		}
+	} else if op.RequestSchema != nil && len(op.RequestSchema.Required) > 0 {
+		return fmt.Errorf("操作 %s 需要 --body 提供查询参数（见 kuaimai-cli schema）", op.Name)
 	}
 	return r.Execute(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
-		data, _, err := c.Request(ctx, method, op.Path, nil)
+		data, _, err := c.Request(ctx, method, path, nil)
 		if err != nil {
 			return nil, err
 		}
-		return common.NormalizeList(data), nil
+		return data, nil
 	})
+}
+
+func formatQueryValue(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		if x == float64(int64(x)) {
+			return strconv.FormatInt(int64(x), 10)
+		}
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case bool:
+		return strconv.FormatBool(x)
+	default:
+		return fmt.Sprint(v)
+	}
 }

@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kuaimai/kuaimai-cli/internal/auth"
-	"github.com/kuaimai/kuaimai-cli/internal/client"
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/core"
-	"github.com/kuaimai/kuaimai-cli/pkg/logger"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/client"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +46,7 @@ func runAPI(method, path string, c *cobra.Command) error {
 	p := f.Printer()
 
 	if err := f.RequireAuth(); err != nil {
-		hint := "请先执行 kuaimai-cli auth login <accessToken> 完成登录"
+		hint := auth.LoginHint
 		var authErr *cmdutil.AuthRequiredError
 		if errors.As(err, &authErr) {
 			hint = authErr.Hint()

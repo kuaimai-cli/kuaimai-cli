@@ -2,6 +2,12 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"os"
+
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/pagination"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
 )
 
 // PostFormAllPages POSTs form bodies with pageNo/pageSize until no more rows.
@@ -17,23 +23,32 @@ func (c *Client) PostFormAllPages(ctx context.Context, path string, baseBody map
 		pageSize = 50
 	}
 
-	allItems := make([]map[string]any, 0)
-	for page := pageNo; page < pageNo+1000; page++ {
-		body := cloneFormBody(baseBody)
-		body["pageNo"] = page
-		body["pageSize"] = pageSize
+	res, err := pagination.CollectPages(core.PaginationSettings(), pageNo, pageSize,
+		func(page, size int) ([]map[string]any, bool, int, error) {
+			body := cloneFormBody(baseBody)
+			body["pageNo"] = page
+			body["pageSize"] = size
 
-		data, _, err := c.PostForm(ctx, path, MapToFormValues(body))
-		if err != nil {
-			return nil, err
-		}
-		items := extractItems(data)
-		allItems = append(allItems, items...)
-		if !formPageHasMore(data, page, pageSize, len(items)) {
-			break
-		}
+			data, _, err := c.PostForm(ctx, path, MapToFormValues(body))
+			if err != nil {
+				return nil, false, 0, err
+			}
+			items := extractItems(data)
+			return items, formPageHasMore(data, page, size, len(items)), nestedTotalFromAny(data), nil
+		})
+	if err != nil {
+		return nil, err
 	}
-	return allItems, nil
+	emitPageNotice(res)
+	return res.Items, nil
+}
+
+func emitPageNotice(res pagination.Result) {
+	if res.Notice == "" {
+		return
+	}
+	fmt.Fprintln(os.Stderr, res.Notice)
+	logger.Info("%s (reason=%s truncated=%v)", res.Notice, res.Reason, res.Truncated)
 }
 
 func cloneFormBody(base map[string]any) map[string]any {

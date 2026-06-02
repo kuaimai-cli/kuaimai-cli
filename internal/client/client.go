@@ -14,11 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kuaimai/kuaimai-cli/internal/auth"
-	"github.com/kuaimai/kuaimai-cli/internal/config"
-	"github.com/kuaimai/kuaimai-cli/pkg/convert"
-	"github.com/kuaimai/kuaimai-cli/pkg/logger"
-	"github.com/kuaimai/kuaimai-cli/pkg/sanitize"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/pagination"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/convert"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/sanitize"
 )
 
 // Client is the unified HTTP client for kuaimai API.
@@ -109,7 +111,7 @@ func (c *Client) requestWithRetry(ctx context.Context, method, path string, body
 func (c *Client) doOnce(ctx context.Context, method, urlStr string, body []byte, contentType string) (any, int, error) {
 	token, err := c.authStore.GetToken()
 	if err != nil {
-		return nil, 0, fmt.Errorf("未登录，请先执行 kuaimai-cli auth login <accessToken>")
+		return nil, 0, fmt.Errorf("未登录，%s", auth.LoginHint)
 	}
 
 	var bodyReader io.Reader
@@ -204,30 +206,32 @@ func (c *Client) RequestAllPages(ctx context.Context, method, path string, body 
 		return data, err
 	}
 
-	allItems := make([]map[string]any, 0)
-	page := 1
 	const pageSize = 100
-
-	for {
-		pagedPath, err := withPageParams(path, page, pageSize)
-		if err != nil {
-			return nil, err
-		}
-		data, _, err := c.Request(ctx, method, pagedPath, body)
-		if err != nil {
-			return nil, err
-		}
-		items, hasMore := extractPageItems(data, page)
-		allItems = append(allItems, items...)
-		if !hasMore || len(items) == 0 {
-			break
-		}
-		page++
-		if page > 1000 {
-			break
-		}
+	res, err := pagination.CollectPages(core.PaginationSettings(), 1, pageSize,
+		func(page, size int) ([]map[string]any, bool, int, error) {
+			pagedPath, err := withPageParams(path, page, size)
+			if err != nil {
+				return nil, false, 0, err
+			}
+			data, _, err := c.Request(ctx, method, pagedPath, body)
+			if err != nil {
+				return nil, false, 0, err
+			}
+			items, hasMore := extractPageItems(data, page)
+			return items, hasMore, nestedTotalFromAny(data), nil
+		})
+	if err != nil {
+		return nil, err
 	}
-	return allItems, nil
+	emitPageNotice(res)
+	return res.Items, nil
+}
+
+func nestedTotalFromAny(data any) int {
+	if m, ok := data.(map[string]any); ok {
+		return nestedTotal(m)
+	}
+	return 0
 }
 
 func withPageParams(path string, page, pageSize int) (string, error) {

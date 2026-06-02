@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func TestAdd_requiresName(t *testing.T) {
-	_, err := Add("", "x.md")
+func TestInstall_requiresName(t *testing.T) {
+	_, err := Install("", InstallOptions{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -20,11 +20,11 @@ func TestList_skipsMissingRoots(t *testing.T) {
 	oldHome := os.Getenv("HOME")
 	_ = os.Setenv("HOME", dir)
 	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
-	old, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	t.Cleanup(func() { _ = os.Chdir(old) })
-	_ = os.MkdirAll(filepath.Join(dir, "skills", "demo"), 0o700)
-	_ = os.WriteFile(filepath.Join(dir, "skills", "demo", "SKILL.md"), []byte("# demo\n"), 0o600)
+
+	agentsRoot := filepath.Join(dir, ".agents", "skills", "demo")
+	_ = os.MkdirAll(agentsRoot, 0o700)
+	_ = os.WriteFile(filepath.Join(agentsRoot, "SKILL.md"), []byte("# demo\n"), 0o600)
+
 	entries, err := List()
 	if err != nil {
 		t.Fatal(err)
@@ -34,81 +34,133 @@ func TestList_skipsMissingRoots(t *testing.T) {
 	}
 }
 
-func TestAddFromURL(t *testing.T) {
+func TestInstall_writesMultipleRoots(t *testing.T) {
+	dir := t.TempDir()
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", dir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
+
+	body := []byte("# test-skill\n")
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		if _, err := writeSkillBytesAtRoot(root, "test-skill", body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ok, err := IsInstalled("test-skill")
+	if err != nil || !ok {
+		t.Fatalf("IsInstalled = %v, err = %v", ok, err)
+	}
+}
+
+func TestWriteSkillTreeAtRoot(t *testing.T) {
+	dir := t.TempDir()
+	files := []skillFile{
+		{relPath: "SKILL.md", body: []byte("# item\n")},
+		{relPath: "references/kuaimai-item-list.md", body: []byte("# list\n")},
+	}
+	skillMD, err := writeSkillTreeAtRoot(dir, "kuaimai-item", files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if skillMD != filepath.Join(dir, "kuaimai-item", "SKILL.md") {
+		t.Fatalf("skillMD = %q", skillMD)
+	}
+	refPath := filepath.Join(dir, "kuaimai-item", "references", "kuaimai-item-list.md")
+	if _, err := os.Stat(refPath); err != nil {
+		t.Fatalf("reference missing: %v", err)
+	}
+}
+
+func TestHasReferences(t *testing.T) {
+	dir := t.TempDir()
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", dir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
+
+	refDir := filepath.Join(dir, ".agents", "skills", "kuaimai-item", "references")
+	_ = os.MkdirAll(refDir, 0o700)
+	ok, err := HasReferences("kuaimai-item")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected references to exist")
+	}
+}
+
+func TestCollectGitHubSkillFiles(t *testing.T) {
+	const skillMD = "# test-skill\n"
+	const refMD = "# reference\n"
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("# test-skill\n"))
+		switch r.URL.Path {
+		case "/raw/SKILL.md":
+			_, _ = w.Write([]byte(skillMD))
+		case "/raw/demo.md":
+			_, _ = w.Write([]byte(refMD))
+		default:
+			http.NotFound(w, r)
+		}
 	}))
 	t.Cleanup(srv.Close)
 
+	entries := []githubContentEntry{
+		{Name: "SKILL.md", Path: "skills/test-skill/SKILL.md", Type: "file", DownloadURL: srv.URL + "/raw/SKILL.md"},
+		{Name: "demo.md", Path: "skills/test-skill/references/demo.md", Type: "file", DownloadURL: srv.URL + "/raw/demo.md"},
+	}
+	files, err := collectGitHubSkillFiles("acme/repo", "main", "skills/test-skill/", entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("files = %d, want 2", len(files))
+	}
+
 	dir := t.TempDir()
 	oldHome := os.Getenv("HOME")
 	_ = os.Setenv("HOME", dir)
 	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
 
-	dest, err := AddFromURL("test-skill", srv.URL)
+	installFiles := []skillFile{
+		{relPath: "SKILL.md", body: []byte(skillMD)},
+		{relPath: "references/demo.md", body: []byte(refMD)},
+	}
+	roots, err := AgentSkillRoots()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(dir, ".agents", "skills", "test-skill", "SKILL.md")
-	if dest != want {
-		t.Fatalf("dest = %q, want %q", dest, want)
+	for _, root := range roots {
+		if _, err := writeSkillTreeAtRoot(root, "test-skill", installFiles); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if _, err := os.Stat(dest); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInstall_fromDir(t *testing.T) {
-	dir := t.TempDir()
-	skillsRoot := filepath.Join(dir, "skills-src")
-	_ = os.MkdirAll(filepath.Join(skillsRoot, "b"), 0o700)
-	_ = os.WriteFile(filepath.Join(skillsRoot, "b", "SKILL.md"), []byte("# b\n"), 0o600)
-
-	oldHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", dir)
-	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
-
-	dest, err := Install("b", InstallOptions{FromDir: skillsRoot})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(dest); err != nil {
-		t.Fatal(err)
+	hasRef, err := HasReferences("test-skill")
+	if err != nil || !hasRef {
+		t.Fatalf("HasReferences = %v, err = %v", hasRef, err)
 	}
 }
 
-func TestInstall_requiresName(t *testing.T) {
-	_, err := Install("", InstallOptions{})
-	if err == nil {
-		t.Fatal("expected error")
+func TestSkillRelPath(t *testing.T) {
+	rel, ok := skillRelPath("skills/foo/", "skills/foo/SKILL.md")
+	if !ok || rel != "SKILL.md" {
+		t.Fatalf("rel=%q ok=%v", rel, ok)
 	}
-}
-
-func TestInstallAllFromDir(t *testing.T) {
-	dir := t.TempDir()
-	skillsRoot := filepath.Join(dir, "skills-src")
-	_ = os.MkdirAll(filepath.Join(skillsRoot, "a"), 0o700)
-	_ = os.WriteFile(filepath.Join(skillsRoot, "a", "SKILL.md"), []byte("# a\n"), 0o600)
-
-	oldHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", dir)
-	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
-
-	results, err := InstallAllFromDir(skillsRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(results) != 1 || results[0].Name != "a" {
-		t.Fatalf("results = %+v", results)
+	_, ok = skillRelPath("skills/foo/", "skills/foo/../bar")
+	if ok {
+		t.Fatal("expected false for path traversal")
 	}
 }
 
 func TestNormalizeRepo(t *testing.T) {
 	cases := map[string]string{
-		"kuaimai/kuaimai-cli":                    "kuaimai/kuaimai-cli",
-		"github:kuaimai/kuaimai-cli":             "kuaimai/kuaimai-cli",
-		"https://github.com/kuaimai/kuaimai-cli": "kuaimai/kuaimai-cli",
-		"invalid":                                "",
+		"kuaimai-cli/kuaimai-cli":                    "kuaimai-cli/kuaimai-cli",
+		"github:kuaimai-cli/kuaimai-cli":             "kuaimai-cli/kuaimai-cli",
+		"https://github.com/kuaimai-cli/kuaimai-cli": "kuaimai-cli/kuaimai-cli",
+		"invalid": "",
 	}
 	for in, want := range cases {
 		if got := normalizeRepo(in); got != want {

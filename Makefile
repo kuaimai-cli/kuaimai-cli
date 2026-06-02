@@ -4,7 +4,7 @@
 GO_ENV := GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 DATE := $(shell date +%Y-%m-%d)
-LDFLAGS := -s -w -X github.com/kuaimai/kuaimai-cli/internal/build.Version=$(VERSION) -X github.com/kuaimai/kuaimai-cli/internal/build.Date=$(DATE)
+LDFLAGS := -s -w -X github.com/kuaimai-cli/kuaimai-cli/internal/build.Version=$(VERSION) -X github.com/kuaimai-cli/kuaimai-cli/internal/build.Date=$(DATE)
 
 fetch_meta:
 	@./scripts/fetch_meta/fetch_meta.sh

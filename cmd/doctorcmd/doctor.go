@@ -3,12 +3,12 @@ package doctorcmd
 import (
 	"os"
 	"os/exec"
-	"path/filepath"
 
-	"github.com/kuaimai/kuaimai-cli/internal/build"
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/config"
-	"github.com/kuaimai/kuaimai-cli/pkg/util"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/build"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/skill"
 	"github.com/spf13/cobra"
 )
 
@@ -32,28 +32,23 @@ func doctorCmd() *cobra.Command {
 
 			loggedIn := f.Auth.IsLoggedIn()
 			path, _ := exec.LookPath("kuaimai-cli")
-			skillDir := filepath.Join(util.ConfigDir(), "..", ".agents", "skills", "kuaimai-item")
-			// prefer ~/.agents/skills
-			home, _ := os.UserHomeDir()
-			if home != "" {
-				skillDir = filepath.Join(home, ".agents", "skills", "kuaimai-item")
-			}
-			_, skillErr := os.Stat(filepath.Join(skillDir, "SKILL.md"))
-			skillOK := skillErr == nil
+			skillOK, _ := skill.IsInstalled("kuaimai-item")
+			refOK, _ := skill.HasReferences("kuaimai-item")
+			skillReady := skillOK && refOK
 
 			checks := []map[string]any{
 				{"name": "config", "ok": configOK, "hint": hintConfig(configOK)},
 				{"name": "auth", "ok": loggedIn, "hint": hintAuth(loggedIn)},
 				{"name": "path", "ok": path != "", "hint": hintPath(path)},
-				{"name": "skill_kuaimai_item", "ok": skillOK, "hint": hintSkill(skillOK)},
+				{"name": "skill_kuaimai_item", "ok": skillReady, "hint": hintSkill(skillOK, refOK)},
 			}
-			allOK := configOK && loggedIn && path != "" && skillOK
+			allOK := configOK && loggedIn && path != "" && skillReady
 
 			return f.Printer().Success(map[string]any{
 				"version": build.Version,
 				"ready":   allOK,
 				"checks":  checks,
-				"next":    nextSteps(configOK, loggedIn, skillOK),
+				"next":    nextSteps(configOK, loggedIn, skillReady),
 			})
 		},
 	}
@@ -70,7 +65,7 @@ func hintAuth(ok bool) string {
 	if ok {
 		return "已登录"
 	}
-	return "执行 kuaimai-cli auth login <accessToken>"
+	return auth.LoginHint
 }
 
 func hintPath(p string) string {
@@ -80,11 +75,14 @@ func hintPath(p string) string {
 	return "将 kuaimai-cli 加入 PATH，或使用 npx @kuaimai-cli/cli"
 }
 
-func hintSkill(ok bool) string {
-	if ok {
-		return "kuaimai-item Skill 已安装"
+func hintSkill(installed, hasRefs bool) string {
+	if installed && hasRefs {
+		return "kuaimai-item Skill 已安装（含 references/）"
 	}
-	return "执行 kuaimai-cli skill install-all --from ./skills"
+	if installed && !hasRefs {
+		return "kuaimai-item 缺少 references/，请执行 kuaimai-cli skill install 重装"
+	}
+	return "执行 kuaimai-cli skill install"
 }
 
 func nextSteps(configOK, loggedIn, skillOK bool) []string {
@@ -93,13 +91,13 @@ func nextSteps(configOK, loggedIn, skillOK bool) []string {
 		steps = append(steps, "kuaimai-cli config init")
 	}
 	if !loggedIn {
-		steps = append(steps, "kuaimai-cli auth login <accessToken>")
+		steps = append(steps, auth.LoginHint)
 	}
 	if loggedIn {
 		steps = append(steps, "kuaimai-cli auth check")
 	}
 	if !skillOK {
-		steps = append(steps, "kuaimai-cli skill install-all --from ./skills")
+		steps = append(steps, "kuaimai-cli skill install")
 	}
 	if len(steps) == 0 {
 		steps = append(steps, "环境就绪，可使用 item +list / item update-title 等命令")

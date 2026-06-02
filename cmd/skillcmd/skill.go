@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/skill"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/skill"
 	"github.com/spf13/cobra"
 )
 
@@ -13,18 +13,17 @@ import (
 func Register(root *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "skill",
-		Short: "Skill 文档仓库（list / install / install-all）",
+		Short: "Skill 文档（list / install，从 GitHub 安装到各 Agent 目录）",
 	}
 	cmd.AddCommand(listCmd())
 	cmd.AddCommand(installCmd())
-	cmd.AddCommand(installAllCmd())
 	root.AddCommand(cmd)
 }
 
 func listCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "列出本地 Skill（./skills 与 ~/.agents/skills）",
+		Short: "列出已安装的 Skill（~/.agents/skills、~/.cursor/skills 等）",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := cmdutil.NewFactory()
 			if err != nil {
@@ -41,59 +40,28 @@ func listCmd() *cobra.Command {
 }
 
 func installCmd() *cobra.Command {
-	var fromDir, repo, gitRef string
+	var repo, gitRef string
 	c := &cobra.Command{
-		Use:   "install <name>",
-		Short: "安装单个 Skill 到 ~/.agents/skills/<name>/（默认从 GitHub 仓库拉取）",
-		Args:  cobra.ExactArgs(1),
+		Use:   "install [name...]",
+		Short: "从 GitHub 安装 Skill 到各 Agent 目录（无参数时安装 kuaimai-shared、kuaimai-item）",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := cmdutil.NewFactory()
 			if err != nil {
 				return err
 			}
-			name := args[0]
-			dest, err := skill.Install(name, skill.InstallOptions{
-				FromDir: fromDir,
-				Repo:    repo,
-				Ref:     gitRef,
-			})
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
-				return err
+			names := args
+			if len(names) == 0 {
+				names = skill.DefaultSkillNames
 			}
-			return f.Printer().Success(map[string]string{
-				"message": "Skill 已安装",
-				"name":    name,
-				"path":    dest,
-			})
-		},
-	}
-	c.Flags().StringVar(&fromDir, "from", "", "本地 skills 目录（安装 <name>/SKILL.md，如 ./skills）")
-	c.Flags().StringVar(&repo, "repo", skill.DefaultGitHubRepo(), "GitHub 仓库（未指定 --from 时使用）")
-	c.Flags().StringVar(&gitRef, "ref", "main", "GitHub 分支或 tag")
-	return c
-}
-
-func installAllCmd() *cobra.Command {
-	var fromDir, repo, gitRef string
-	c := &cobra.Command{
-		Use:   "install-all",
-		Short: "批量安装 Skill 到 ~/.agents/skills/（本地目录或 GitHub 仓库）",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			f, err := cmdutil.NewFactory()
-			if err != nil {
-				return err
-			}
+			opts := skill.InstallOptions{Repo: repo, Ref: gitRef}
 			var results []skill.InstallResult
-			switch {
-			case fromDir != "":
-				results, err = skill.InstallAllFromDir(fromDir)
-			default:
-				results, err = skill.InstallAllFromGitHub(repo, gitRef)
-			}
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
-				return err
+			for _, name := range names {
+				res, err := skill.Install(name, opts)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					return err
+				}
+				results = append(results, res)
 			}
 			return f.Printer().Success(map[string]any{
 				"message": "Skills 已安装",
@@ -102,8 +70,7 @@ func installAllCmd() *cobra.Command {
 			})
 		},
 	}
-	c.Flags().StringVar(&fromDir, "from", "", "本地 skills 目录（如 ./skills）")
-	c.Flags().StringVar(&repo, "repo", skill.DefaultGitHubRepo(), "GitHub 仓库（默认 kuaimai/kuaimai-cli）")
+	c.Flags().StringVar(&repo, "repo", skill.DefaultGitHubRepo(), "GitHub 仓库（owner/repo）")
 	c.Flags().StringVar(&gitRef, "ref", "main", "GitHub 分支或 tag")
 	return c
 }

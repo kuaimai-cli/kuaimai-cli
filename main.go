@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kuaimai/kuaimai-cli/cmd"
+	"github.com/kuaimai-cli/kuaimai-cli/cmd"
 )
 
 func main() {

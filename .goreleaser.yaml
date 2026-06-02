@@ -10,6 +10,7 @@ builds:
   - id: kuaimai-cli
     main: .
     binary: kuaimai-cli
+    mod: mod
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,8 +25,8 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X github.com/kuaimai/kuaimai-cli/internal/build.Version={{.Version}}
-      - -X github.com/kuaimai/kuaimai-cli/internal/build.Date={{.Date}}
+      - -X github.com/kuaimai-cli/kuaimai-cli/internal/build.Version={{.Version}}
+      - -X github.com/kuaimai-cli/kuaimai-cli/internal/build.Date={{.Date}}
 
 archives:
   - id: default
@@ -39,6 +40,7 @@ archives:
     files:
       - skills/**/*
       - AGENTS.md
+      - CHANGELOG.md
 
 checksum:
   name_template: "checksums.txt"
@@ -49,9 +51,77 @@ release:
     name: kuaimai-cli
   draft: false
   prerelease: auto
+  name_template: "kuaimai-cli {{.Version}}"
+  header: |
+    快麦 ERP **商品域（erp-items-core）** CLI — 架构对标 [飞书 lark-cli](https://github.com/larksuite/cli)。
+
+    **变更记录**：见 [CHANGELOG.md](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/CHANGELOG.md)（发版前请将 `Unreleased` 归入本 tag 版本号）。
+
+    ### 能力快照
+
+    | 模块 | 说明 |
+    |------|------|
+    | meta | `meta_data.json` **v1.6.0** — `item` 域 **1157** 个 operation |
+    | shortcuts | `item +list` / `count` / `get-detail` / `save` / `update-title` |
+    | service | `kuaimai-cli service item <operation>` 原子 API 兜底 |
+    | 分页 | `--page-all` · `--page-limit` · `--page-confirm`（500/1000 条阈值防护） |
+    | Skill | `kuaimai-shared` + `kuaimai-item` v2.0.0（`references/` 工作流） |
+
+    ### 安装（npm，推荐）
+
+    ```bash
+    npx @kuaimai-cli/cli@latest install
+    ```
+
+    或从下方 **Assets** 下载对应平台二进制（`checksums.txt` 可校验 SHA256）。
+
+    ### 首次使用
+
+    ```bash
+    kuaimai-cli config init
+    kuaimai-cli auth login "<accessToken>"
+    kuaimai-cli skill install
+    kuaimai-cli auth check --output json
+    kuaimai-cli doctor --output json
+    ```
+
+    ### Agent
+
+    安装 Skill 后 Read `kuaimai-item/SKILL.md`；写操作先 Read `references/`。约定见 [AGENTS.md](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/AGENTS.md)。
+
+  footer: |
+    ### 升级
+
+    ```bash
+    kuaimai-cli upgrade --output json
+    npx @kuaimai-cli/cli@latest install
+    ```
+
+    ### 发布资产
+
+    | 平台 | 包名 |
+    |------|------|
+    | macOS arm64 | `kuaimai-cli-{{.Version}}-darwin-arm64.tar.gz` |
+    | macOS amd64 | `kuaimai-cli-{{.Version}}-darwin-amd64.tar.gz` |
+    | Linux amd64 | `kuaimai-cli-{{.Version}}-linux-amd64.tar.gz` |
+    | Linux arm64 | `kuaimai-cli-{{.Version}}-linux-arm64.tar.gz` |
+    | Windows amd64 | `kuaimai-cli-{{.Version}}-windows-amd64.zip` |
+
+    归档内附带 `skills/`、`AGENTS.md`、`CHANGELOG.md`。
+
+    ### 文档
+
+    - [README](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/README.md)
+    - [文档索引](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/docs/README.md)
+    - [验收测试](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/docs/kuaimai-cli%20验收测试.md)
+
+    ---
+
+    **Full Changelog**: https://github.com/kuaimai-cli/kuaimai-cli/compare/{{.PreviousTag}}...{{.Tag}}
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
+# 版本说明正文以 release.header/footer + CHANGELOG.md 为准；不启用自动生成 changelog 以免与手工维护冲突
 changelog:
   disable: true

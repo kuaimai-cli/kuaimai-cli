@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kuaimai/kuaimai-cli/pkg/util"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/util"
 )
 
 // Record appends a single audit line for business commands.

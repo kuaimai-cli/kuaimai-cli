@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kuaimai/kuaimai-cli/internal/auth"
-	"github.com/kuaimai/kuaimai-cli/internal/client"
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/config"
-	"github.com/kuaimai/kuaimai-cli/pkg/logger"
-	"github.com/kuaimai/kuaimai-cli/shortcuts/item"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/client"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
+	"github.com/kuaimai-cli/kuaimai-cli/shortcuts/item"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +45,7 @@ func loginCmd() *cobra.Command {
 				fmt.Fprintln(os.Stderr, err.Error())
 				f, _ := cmdutil.NewFactory()
 				if f != nil {
-					_ = f.Printer().Fail(err.Error(), "用法: kuaimai-cli auth login <accessToken>")
+					_ = f.Printer().Fail(err.Error(), auth.LoginHint)
 				}
 				return err
 			}
@@ -133,6 +133,9 @@ func statusCmd() *cobra.Command {
 				"header":    auth.HeaderAccessToken,
 				"api_url":   f.Config.ProfileAPIURL(f.Auth.Profile()),
 			}
+			if !loggedIn {
+				result["hint"] = auth.LoginHint
+			}
 			if loggedIn {
 				if tok, err := f.Auth.GetToken(); err == nil {
 					result["token_preview"] = auth.TokenPreview(tok)
@@ -153,7 +156,7 @@ func checkCmd() *cobra.Command {
 				return err
 			}
 			if err := f.RequireAuth(); err != nil {
-				_ = f.Printer().Fail(err.Error(), "请先执行 kuaimai-cli auth login <accessToken>")
+				_ = f.Printer().Fail(err.Error(), auth.LoginHint)
 				return err
 			}
 			httpClient, err := f.HTTPClient()
@@ -231,5 +234,5 @@ func hintForUse(loggedIn bool) string {
 	if loggedIn {
 		return ""
 	}
-	return "该 profile 尚未登录，请执行 kuaimai-cli auth login --profile <name> <accessToken>"
+	return "该 profile 尚未登录，" + auth.LoginHint
 }

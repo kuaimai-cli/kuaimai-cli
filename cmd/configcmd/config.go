@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/config"
-	"github.com/kuaimai/kuaimai-cli/internal/output"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 

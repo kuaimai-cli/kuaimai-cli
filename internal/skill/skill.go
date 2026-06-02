@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,19 +10,19 @@ import (
 	"sort"
 	"strings"
 	"time"
-
 )
 
 const (
-	defaultGitHubRepo = "kuaimai/kuaimai-cli"
+	defaultGitHubRepo = "kuaimai-cli/kuaimai-cli"
 	defaultGitRef     = "main"
 	httpTimeout       = 30 * time.Second
+	maxSkillFileSize  = 1 << 20 // 1 MiB per file
 )
 
-// DefaultGitHubRepo is the repository used by skill install-all.
+// DefaultGitHubRepo is the repository used by skill install.
 func DefaultGitHubRepo() string { return defaultGitHubRepo }
 
-// DefaultSkillNames are bundled skills shipped in the repository skills/ directory.
+// DefaultSkillNames are bundled skills in the GitHub repo skills/ directory.
 var DefaultSkillNames = []string{"kuaimai-shared", "kuaimai-item"}
 
 // Entry describes an installed SKILL.md.
@@ -32,18 +33,56 @@ type Entry struct {
 	Preview string `json:"preview,omitempty"`
 }
 
-// AgentSkillsDir returns ~/.agents/skills (cross-agent skill convention).
-func AgentSkillsDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("无法确定用户目录: %w", err)
-	}
-	return filepath.Join(home, ".agents", "skills"), nil
+// InstallResult describes one installed skill.
+type InstallResult struct {
+	Name  string   `json:"name"`
+	Paths []string `json:"paths"`
 }
 
-// List discovers skills under ./skills and ~/.agents/skills.
+// InstallOptions configures skill install (GitHub only).
+type InstallOptions struct {
+	Repo string
+	Ref  string
+}
+
+type githubContentEntry struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Type        string `json:"type"`
+	DownloadURL string `json:"download_url"`
+}
+
+type skillFile struct {
+	relPath string
+	body    []byte
+}
+
+// AgentSkillRoots returns global skill directories for mainstream AI agents.
+func AgentSkillRoots() ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("无法确定用户目录: %w", err)
+	}
+	rel := []string{
+		filepath.Join(".agents", "skills"),
+		filepath.Join(".cursor", "skills"),
+		filepath.Join(".codex", "skills"),
+		filepath.Join(".claude", "skills"),
+		filepath.Join(".windsurf", "skills"),
+	}
+	var roots []string
+	for _, r := range rel {
+		roots = append(roots, filepath.Join(home, r))
+	}
+	return roots, nil
+}
+
+// List discovers skills installed under agent skill roots (~/.agents/skills, etc.).
 func List() ([]Entry, error) {
-	roots := searchRoots()
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		return nil, err
+	}
 	seen := make(map[string]struct{})
 	var out []Entry
 	for _, root := range roots {
@@ -64,17 +103,6 @@ func List() ([]Entry, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
-}
-
-func searchRoots() []string {
-	var roots []string
-	if cwd, err := os.Getwd(); err == nil {
-		roots = append(roots, filepath.Join(cwd, "skills"))
-	}
-	if dir, err := AgentSkillsDir(); err == nil {
-		roots = append(roots, dir)
-	}
-	return roots
 }
 
 func listInRoot(root string) ([]Entry, error) {
@@ -114,110 +142,44 @@ func readPreview(path string, maxLines int) (string, error) {
 	return strings.TrimSpace(strings.Join(lines, "\n")), nil
 }
 
-// Add installs a SKILL.md into ~/.agents/skills/<name>/SKILL.md from a local file path.
-func Add(name, fromPath string) (string, error) {
+// IsInstalled reports whether name exists under any agent skill root.
+func IsInstalled(name string) (bool, error) {
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		return false, err
+	}
+	for _, root := range roots {
+		if _, err := os.Stat(filepath.Join(root, name, "SKILL.md")); err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// HasReferences reports whether name has a references/ directory under any agent skill root.
+func HasReferences(name string) (bool, error) {
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		return false, err
+	}
+	for _, root := range roots {
+		refDir := filepath.Join(root, name, "references")
+		info, err := os.Stat(refDir)
+		if err == nil && info.IsDir() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Install downloads the full skill directory from GitHub and installs into all agent skill roots.
+func Install(name string, opts InstallOptions) (InstallResult, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", fmt.Errorf("skill 名称不能为空")
+		return InstallResult{}, fmt.Errorf("skill 名称不能为空")
 	}
 	if strings.Contains(name, "/") || strings.Contains(name, "..") {
-		return "", fmt.Errorf("skill 名称不合法")
-	}
-	fromPath = strings.TrimSpace(fromPath)
-	if fromPath == "" {
-		return "", fmt.Errorf("请指定 SKILL.md 源文件路径")
-	}
-	src, err := os.Open(fromPath)
-	if err != nil {
-		return "", fmt.Errorf("读取源文件失败: %w", err)
-	}
-	defer src.Close()
-	return writeSkill(name, src, fromPath)
-}
-
-// AddFromURL downloads SKILL.md from url and installs it.
-func AddFromURL(name, rawURL string) (string, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", fmt.Errorf("skill 名称不能为空")
-	}
-	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" {
-		return "", fmt.Errorf("请指定 URL")
-	}
-	body, err := fetchURL(rawURL)
-	if err != nil {
-		return "", err
-	}
-	return writeSkillBytes(name, body, rawURL)
-}
-
-// AddFromGitHub installs SKILL.md from raw.githubusercontent.com/{repo}/{ref}/skills/{name}/SKILL.md.
-func AddFromGitHub(name, repo, ref string) (string, error) {
-	repo = normalizeRepo(repo)
-	if repo == "" {
-		return "", fmt.Errorf("GitHub 仓库不合法")
-	}
-	if ref == "" {
-		ref = defaultGitRef
-	}
-	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/skills/%s/SKILL.md", repo, ref, name)
-	return AddFromURL(name, rawURL)
-}
-
-// InstallResult describes one installed skill.
-type InstallResult struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-}
-
-// InstallAllFromDir copies every skills/*/SKILL.md from dir into ~/.agents/skills/.
-func InstallAllFromDir(dir string) ([]InstallResult, error) {
-	dir = strings.TrimSpace(dir)
-	if dir == "" {
-		return nil, fmt.Errorf("请指定 skills 目录")
-	}
-	names, err := discoverSkillNames(dir)
-	if err != nil {
-		return nil, err
-	}
-	if len(names) == 0 {
-		return nil, fmt.Errorf("目录 %s 下未找到 Skill", dir)
-	}
-	var out []InstallResult
-	for _, name := range names {
-		srcPath := filepath.Join(dir, name, "SKILL.md")
-		dest, err := Add(name, srcPath)
-		if err != nil {
-			return out, fmt.Errorf("安装 %s 失败: %w", name, err)
-		}
-		out = append(out, InstallResult{Name: name, Path: dest})
-	}
-	return out, nil
-}
-
-// InstallOptions configures a single-skill install.
-type InstallOptions struct {
-	FromDir string
-	Repo    string
-	Ref     string
-}
-
-// Install installs one skill into ~/.agents/skills/<name>/ from a local skills dir or GitHub.
-func Install(name string, opts InstallOptions) (string, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", fmt.Errorf("skill 名称不能为空")
-	}
-	if strings.Contains(name, "/") || strings.Contains(name, "..") {
-		return "", fmt.Errorf("skill 名称不合法")
-	}
-	if dir := strings.TrimSpace(opts.FromDir); dir != "" {
-		srcPath := filepath.Join(dir, name, "SKILL.md")
-		if _, err := os.Stat(srcPath); err != nil {
-			return "", fmt.Errorf("未找到 %s: %w", srcPath, err)
-		}
-		return Add(name, srcPath)
+		return InstallResult{}, fmt.Errorf("skill 名称不合法")
 	}
 	repo := normalizeRepo(opts.Repo)
 	if repo == "" {
@@ -227,42 +189,146 @@ func Install(name string, opts InstallOptions) (string, error) {
 	if ref == "" {
 		ref = defaultGitRef
 	}
-	return AddFromGitHub(name, repo, ref)
+	files, err := fetchSkillTreeFromGitHub(name, repo, ref)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		return InstallResult{}, err
+	}
+	var paths []string
+	for _, root := range roots {
+		dest, err := writeSkillTreeAtRoot(root, name, files)
+		if err != nil {
+			return InstallResult{Name: name, Paths: paths}, fmt.Errorf("安装到 %s 失败: %w", root, err)
+		}
+		paths = append(paths, dest)
+	}
+	return InstallResult{Name: name, Paths: paths}, nil
 }
 
-// InstallAllFromGitHub installs default skills from a GitHub repository.
-func InstallAllFromGitHub(repo, ref string) ([]InstallResult, error) {
-	repo = normalizeRepo(repo)
-	if repo == "" {
-		repo = defaultGitHubRepo
-	}
+// InstallDefaults installs DefaultSkillNames from GitHub.
+func InstallDefaults(opts InstallOptions) ([]InstallResult, error) {
 	var out []InstallResult
 	for _, name := range DefaultSkillNames {
-		dest, err := AddFromGitHub(name, repo, ref)
+		res, err := Install(name, opts)
 		if err != nil {
-			return out, fmt.Errorf("安装 %s 失败: %w", name, err)
+			return out, err
 		}
-		out = append(out, InstallResult{Name: name, Path: dest})
+		out = append(out, res)
 	}
 	return out, nil
 }
 
-func discoverSkillNames(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
+func fetchSkillTreeFromGitHub(name, repo, ref string) ([]skillFile, error) {
+	prefix := "skills/" + name + "/"
+	entries, err := listGitHubContents(repo, ref, "skills/"+name)
 	if err != nil {
-		return nil, fmt.Errorf("读取目录失败: %w", err)
+		// Fallback: install SKILL.md only when Contents API is unavailable.
+		body, fetchErr := fetchSkillMDFromGitHub(name, repo, ref)
+		if fetchErr != nil {
+			return nil, fmt.Errorf("列举 skill 目录失败: %w（回退 SKILL.md 也失败: %v）", err, fetchErr)
+		}
+		fmt.Fprintf(os.Stderr, "[skill] 警告: 无法列举完整 skill 目录，仅安装 SKILL.md: %v\n", err)
+		return []skillFile{{relPath: "SKILL.md", body: body}}, nil
 	}
-	var names []string
+	files, err := collectGitHubSkillFiles(repo, ref, prefix, entries)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("skill %q 在仓库中无文件", name)
+	}
+	hasSKILL := false
+	for _, f := range files {
+		if f.relPath == "SKILL.md" {
+			hasSKILL = true
+			break
+		}
+	}
+	if !hasSKILL {
+		return nil, fmt.Errorf("skill %q 缺少 SKILL.md", name)
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].relPath < files[j].relPath })
+	return files, nil
+}
+
+func collectGitHubSkillFiles(repo, ref, prefix string, entries []githubContentEntry) ([]skillFile, error) {
+	var files []skillFile
 	for _, ent := range entries {
-		if !ent.IsDir() {
+		rel, ok := skillRelPath(prefix, ent.Path)
+		if !ok {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(dir, ent.Name(), "SKILL.md")); err == nil {
-			names = append(names, ent.Name())
+		switch ent.Type {
+		case "file":
+			if ent.DownloadURL == "" {
+				return nil, fmt.Errorf("缺少 download_url: %s", ent.Path)
+			}
+			body, err := fetchURL(ent.DownloadURL)
+			if err != nil {
+				return nil, fmt.Errorf("下载 %s 失败: %w", ent.Path, err)
+			}
+			files = append(files, skillFile{relPath: rel, body: body})
+		case "dir":
+			sub, err := listGitHubContents(repo, ref, ent.Path)
+			if err != nil {
+				return nil, err
+			}
+			subFiles, err := collectGitHubSkillFiles(repo, ref, prefix, sub)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, subFiles...)
 		}
 	}
-	sort.Strings(names)
-	return names, nil
+	return files, nil
+}
+
+func skillRelPath(prefix, fullPath string) (string, bool) {
+	if !strings.HasPrefix(fullPath, prefix) {
+		return "", false
+	}
+	rel := strings.TrimPrefix(fullPath, prefix)
+	if rel == "" || strings.Contains(rel, "..") {
+		return "", false
+	}
+	return rel, true
+}
+
+func listGitHubContents(repo, ref, path string) ([]githubContentEntry, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/contents/%s?ref=%s", repo, path, ref)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{Timeout: httpTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求 GitHub API 失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("GitHub API HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var entries []githubContentEntry
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("解析 GitHub API 响应失败: %w", err)
+	}
+	return entries, nil
+}
+
+func fetchSkillMDFromGitHub(name, repo, ref string) ([]byte, error) {
+	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/skills/%s/SKILL.md", repo, ref, name)
+	return fetchURL(rawURL)
 }
 
 func normalizeRepo(repo string) string {
@@ -287,7 +353,7 @@ func fetchURL(rawURL string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("下载失败: HTTP %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSkillFileSize))
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
@@ -297,28 +363,31 @@ func fetchURL(rawURL string) ([]byte, error) {
 	return body, nil
 }
 
-func writeSkill(name string, src io.Reader, source string) (string, error) {
-	dir, err := AgentSkillsDir()
-	if err != nil {
+func writeSkillTreeAtRoot(root, name string, files []skillFile) (string, error) {
+	skillDir := filepath.Join(root, name)
+	if err := os.RemoveAll(skillDir); err != nil {
 		return "", err
 	}
-	destDir := filepath.Join(dir, name)
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return "", err
+	var skillMDPath string
+	for _, f := range files {
+		destPath := filepath.Join(skillDir, filepath.FromSlash(f.relPath))
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(destPath, f.body, 0o644); err != nil {
+			return "", err
+		}
+		if f.relPath == "SKILL.md" {
+			skillMDPath = destPath
+		}
 	}
-	destPath := filepath.Join(destDir, "SKILL.md")
-	dest, err := os.OpenFile(destPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return "", err
+	if skillMDPath == "" {
+		return "", fmt.Errorf("未写入 SKILL.md")
 	}
-	defer dest.Close()
-	if _, err := io.Copy(dest, src); err != nil {
-		return "", err
-	}
-	_ = source
-	return destPath, nil
+	return skillMDPath, nil
 }
 
-func writeSkillBytes(name string, body []byte, source string) (string, error) {
-	return writeSkill(name, strings.NewReader(string(body)), source)
+// writeSkillBytesAtRoot writes a single SKILL.md (used in tests).
+func writeSkillBytesAtRoot(root, name string, body []byte) (string, error) {
+	return writeSkillTreeAtRoot(root, name, []skillFile{{relPath: "SKILL.md", body: body}})
 }

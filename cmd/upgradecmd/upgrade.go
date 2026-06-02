@@ -1,8 +1,8 @@
 package upgradecmd
 
 import (
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/upgrade"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/upgrade"
 	"github.com/spf13/cobra"
 )
 

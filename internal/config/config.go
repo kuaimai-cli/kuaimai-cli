@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kuaimai/kuaimai-cli/pkg/util"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/util"
 	"github.com/spf13/viper"
 )
 

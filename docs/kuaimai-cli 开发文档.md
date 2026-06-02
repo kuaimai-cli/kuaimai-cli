@@ -1,6 +1,6 @@
 # kuaimai-cli 架构设计与分阶段开发白皮书（对标飞书 Lark-CLI）
 
-> 配套：[文档索引](./README.md) · [本地使用实操指南](./kuaimai-cli%20本地使用实操指南.md) · [系统架构说明](./系统架构与飞书对标说明.md) · [每阶段新增能力](./每阶段新增能力.md) · [验收测试](./kuaimai-cli%20验收测试.md)
+> 配套：[文档索引](./README.md) · [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) · [系统架构说明](./系统架构与飞书对标说明.md) · [每阶段新增能力](./每阶段新增能力.md) · [验收测试](./kuaimai-cli%20验收测试.md)
 
 ---
 
@@ -12,12 +12,12 @@ kuaimai-cli 是快麦 **erp-items-core** 商品业务专属、平台级私有化
 
 **核心目标**：架构一次性对齐飞书，能力分阶段渐进补齐；适配人工运维、Shell 脚本自动化、AI Agent。
 
-**当前状态（阶段三 item 域 + 阶段四部分）**：
+**当前状态（框架已定稿 + item 域业务闭环）**：
 
-- 基建：config / auth / api / output / client / runner  
-- 业务：**商品标题查改闭环** — `item +list` → `item update-title`（或 `get-detail` → `save`）  
-- 元数据：`meta_data.json` **v1.2.0**（1 service / 4 operations）  
-- 平台：Skill · csv/ndjson · 连接池/熔断 · 脱敏 · 审计 · `--page-all`  
+- 基建：config / auth / api / output / client / runner / **pagination**
+- 业务：**商品标题查改闭环** — `item +list` → `item update-title`（或 `get-detail` → `save`）
+- 元数据：`meta_data.json` **v1.6.0**（1 service / **1157** operations；核心 6 个见 [定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)）
+- 平台：Skill v2.0.0 · csv/ndjson · 连接池/熔断 · 脱敏 · 审计 · `--page-all` / **`--page-limit`** / **`--page-confirm`**
 - 阶段四：`auth check` / 多 profile · `doctor` / `upgrade` · E2E · 根 README/CHANGELOG/CI
 
 ### 1.2 核心设计原则
@@ -58,7 +58,8 @@ kuaimai-cli/
 ├── internal/
 │   ├── config/             # template.go + Init/Get/Set
 │   ├── auth/
-│   ├── client/             # HTTP、重试、--page-all、连接池/熔断
+│   ├── client/             # HTTP、重试、分页入口、连接池/熔断
+│   ├── pagination/         # --page-all 阈值、交互续查、分片合并
 │   ├── output/
 │   ├── registry/           # meta_data.json（embed）
 │   ├── cmdutil/
@@ -67,7 +68,7 @@ kuaimai-cli/
 │   ├── common/             # runner, RunGET/RunPOST/RunPOSTForm…
 │   └── item/               # erp-items-core 商品
 ├── scripts/fetch_meta/
-├── skills/                 # kuaimai-item 等 SKILL.md
+├── skills/                 # kuaimai-shared、kuaimai-item（SKILL.md + references/）
 ├── tests/cli_e2e/          # E2E 冒烟（mock HTTP）
 └── .github/workflows/ci.yml
 ```
@@ -76,7 +77,7 @@ kuaimai-cli/
 
 1. `cmd` 无业务、无网络逻辑  
 2. 业务仅在 `shortcuts/`  
-3. `skills/` 无 Go 业务代码  
+3. `skills/` 无 Go 业务代码；域 Skill 主文件路由，细节放 `references/`  
 
 ---
 
@@ -96,7 +97,7 @@ kuaimai-cli api GET|POST|PUT|DELETE <path> [--body '{}']
 kuaimai-cli schema
 kuaimai-cli service item <operation> [--body '{}']
 
-kuaimai-cli skill list | skill install <name> | skill install-all
+kuaimai-cli skill list | skill install [name...]
 kuaimai-cli upgrade | doctor
 kuaimai-cli completion bash|zsh|powershell
 ```
@@ -111,7 +112,7 @@ kuaimai-cli completion bash|zsh|powershell
 
 ### 4.3 全局参数
 
-`--output table|json|csv|ndjson` · `--dry-run` · `--verbose` · `--page-all` · `--no-color`
+`--output table|json|csv|ndjson` · `--dry-run` · `--verbose` · `--page-all` · `--page-limit` · `--page-confirm` · `--no-color`
 
 ### 4.4 config init 规范
 
@@ -121,9 +122,39 @@ kuaimai-cli completion bash|zsh|powershell
 
 **输出优先级**：`--output` > `cli.output` > `table`
 
-详见 [本地使用实操指南 · 配置管理](./kuaimai-cli%20本地使用实操指南.md#二配置管理首次必做)。
+### 4.5 元数据注册表（meta_data.json）
 
-### 4.5 当前业务 shortcuts 索引（erp-items-core）
+**唯一规范**：[kuaimai-cli meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)
+
+| 概念 | 说明 |
+|------|------|
+| 存储层 | `internal/registry/meta_data.json` 嵌入二进制，驱动 `service` / `schema` |
+| 展示层 | `kuaimai-cli schema` 从 meta 读取并格式化输出（meta 存数据，schema 查数据） |
+| service 名 | 固定 `item`，对应 `erp-items-core` |
+| operation 命名 | `模块-操作` 小写短横线，如 `stock-list`、`item-save`（**非** shortcuts 子命令名） |
+| contentType | `get_query` · `post_form` · `post_json` |
+| write | 查询 `false`；写接口 `true`；`--dry-run` 仅对 `write:true` 生效 |
+| pageable | 分页列表 `true`；配合 `--page-all` 自动翻页；`--page-limit` / `--page-confirm` 控制海量数据防护 |
+
+**shortcuts 与 meta operation 对照**（双轨：Agent 优先左列）：
+
+| shortcuts | meta operation | contentType | write | pageable |
+|-----------|----------------|-------------|-------|----------|
+| `item +list` / `item list` | `stock-list` | post_form | false | true |
+| `item count` | `stock-count` | post_form | false | false |
+| （无） | `item-query-list-v2` | post_form | false | true |
+| `item get-detail` | `item-detail` | get_query | false | false |
+| `item save` | `item-save` | post_json | true | false |
+| `item update-title`（编排） | `item-update-title`（原子 save） | post_json | true | false |
+
+其余 **1151** 个 operation 仅通过 `service item <operation>` 调用。
+
+```bash
+kuaimai-cli service item stock-list --body '{"title":"test","pageNo":1,"pageSize":50}'
+kuaimai-cli schema --output json
+```
+
+### 4.6 当前业务 shortcuts 索引（erp-items-core）
 
 **注册位置**：`cmd/root.go` → `shortcuts/item.Register`
 
@@ -140,14 +171,30 @@ kuaimai-cli completion bash|zsh|powershell
 - 查：`list`/`+list` 的 `--body.title`（配合 `isAccurate` 模糊/精确）  
 - 改：`save` 的 `--body` 中 `sysItemId` + `title`  
 
-完整对照表见 [每阶段新增能力 · 附录](./每阶段新增能力.md#附录shortcuts-与-api-对照表当前)。
+完整对照表见 [每阶段新增能力 · 附录](./每阶段新增能力.md#附录shortcuts-与-meta-operation-对照表当前)。
+
+### 4.7 Skill 平台（对标飞书 lark-*）
+
+| 项 | 说明 |
+|----|------|
+| 仓库源 | `skills/kuaimai-shared/`、`skills/kuaimai-item/` |
+| 域结构 | 主 `SKILL.md` 路由 + `references/` 工作流文档 |
+| 安装 | `skill install` → GitHub Contents API 递归拉取整目录 → 5 个 Agent 目录 |
+| Agent 约定 | 域 Skill **CRITICAL** 读 shared；写操作先 Read `references/` |
+
+**新增/变更 Skill 步骤**：
+
+1. 更新 `skills/<domain>/SKILL.md`（选命令、Shortcuts 表、API Resources）
+2. 复杂流程写入 `skills/<domain>/references/*.md`
+3. 若涉及全局约定，同步 `skills/kuaimai-shared/SKILL.md`
+4. 本地验证后 push，用户侧执行 `skill install` 或重装
 
 **新增 shortcuts 步骤**：
 
 1. 在 `shortcuts/item/`（或新域目录）实现，使用 `common.Run*`  
 2. `cmd/root.go` 中 `Register(rootCmd)`  
-3. 更新 `internal/registry/meta_data.json`  
-4. 更新 `skills/kuaimai-item/SKILL.md` 与本文档、[验收测试](./kuaimai-cli%20验收测试.md)
+3. 按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 更新 `internal/registry/meta_data.json`（operation 用 `模块-操作` 命名，填齐 path/method/contentType/write/pageable/requestSchema/responseSchema）  
+4. 更新 `skills/kuaimai-item/SKILL.md`、对应 `references/`（如有新 shortcut）、本文档、[验收测试](./kuaimai-cli%20验收测试.md)
 
 ---
 
@@ -160,14 +207,14 @@ kuaimai-cli completion bash|zsh|powershell
 ### 阶段二：标准企业版（~80%，已完成）
 
 - `shortcuts/common/runner` + `RunGET`/`RunPOST`/`RunPOSTForm`  
-- `schema` / `service` / `meta_data.json`（随业务演进，当前 v1.2.0）  
-- 重试 · `--page-all` · completion · dry-run · 彩色 table  
+- `schema` / `service` / `meta_data.json`（当前 **v1.6.0**，1157 operations）
+- 重试 · `--page-all` · **`--page-limit`** · **`--page-confirm`** · completion · dry-run · 彩色 table
 
 ### 阶段三：平台进阶版（已完成，item 域）
 
 - **erp-items-core shortcuts**：list/count/get-detail/save  
 - **商品标题查改**（系统当前主要业务验收项）  
-- Skill · csv/ndjson · 连接池/熔断 · 脱敏 · form 分页 `--page-all` · 审计日志  
+- Skill v2.0.0 · csv/ndjson · 连接池/熔断 · 脱敏 · form 分页 + 海量数据防护 · 审计日志
 
 ### 阶段四：AI 终局版（进行中）
 
@@ -179,8 +226,8 @@ kuaimai-cli completion bash|zsh|powershell
 | `item update-title` | ✅ |
 | `auth check` | ✅ |
 | README / CHANGELOG / Dockerfile / CI | ✅ |
-| GitHub Release · npm · Skill | ✅（阶段四初已具备） |
-| 更多 erp 业务域 shortcuts | 规划 |
+| GitHub Release · npm · Skill（飞书风格 + references） | ✅（阶段四初已具备） |
+| 更多 erp 业务域 shortcuts | 规划（meta 已就绪，按场景加 shortcut/Skill 即可） |
 
 ---
 
@@ -204,7 +251,7 @@ make build
 
 ## 七、与飞书 CLI 差异（迭代依据）
 
-**已对齐**：分层 · 三级命令 · shortcuts 手写 · registry/service · 密钥链 · 结构化 stdout · Skill 目录 · csv/ndjson  
+**已对齐**：分层 · 三级命令 · shortcuts 手写 · registry/service · 密钥链 · 结构化 stdout · Skill 目录（含 `references/`）· csv/ndjson  
 
 **差异**：业务域体量（当前 1 域 vs 飞书 18+）· 鉴权（accessToken vs OAuth）· E2E/升级待补齐  
 
@@ -216,9 +263,9 @@ make build
 
 - [ ] 目录符合第三节规范  
 - [ ] `cmd` 无业务逻辑  
-- [ ] 新接口同步 `shortcuts/item` + `meta_data.json` + Skill + 文档  
+- [ ] 新接口同步 `shortcuts/item` + `meta_data.json`（符合[定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)）+ Skill + 文档  
 - [ ] `api.url` 为 `https://erp1.superboss.cc/`  
-- [ ] 三级命令可用：`item +list` / `service item list` / `api POST`  
+- [ ] 三级命令可用：`item +list` / `service item stock-list` / `api POST`  
 - [ ] 标题流程：`+list` → `update-title --dry-run` → `update-title` 可跑通  
 - [ ] 错误无堆栈  
 - [ ] `go build` / `go test ./...` 通过  
@@ -229,4 +276,6 @@ make build
 
 ## 九、总结
 
-kuaimai-cli 采用「**骨架一次搭建、能力分阶段补齐**」：阶段一/二交付飞书式基建；**阶段三交付 erp-items-core 商品域，并以标题查改为首要业务场景**。日常联调与命令示例以 [本地使用实操指南](./kuaimai-cli%20本地使用实操指南.md) 为准；架构与对标见 [系统架构与飞书对标说明](./系统架构与飞书对标说明.md)。
+kuaimai-cli 采用「**骨架一次搭建、能力分阶段补齐**」：阶段一/二交付飞书式基建；**阶段三交付 erp-items-core 商品域**（标题查改闭环）。**框架已定稿**（meta v1.6.0 + Skill + CLI 分页防护）；后续 primarily 登记 meta 与 curated shortcuts。
+
+日常联调见仓库根 [README.md](../README.md)；元数据见 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)；架构见 [系统架构与飞书对标说明](./系统架构与飞书对标说明.md)；文档索引见 [docs/README.md](./README.md)。

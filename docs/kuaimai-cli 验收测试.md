@@ -1,6 +1,6 @@
 # kuaimai-cli 阶段开发准入、最低可用标准、阶段验收测试规范
 
-> 对标飞书 CLI；与 [开发文档](./kuaimai-cli%20开发文档.md)、[每阶段新增能力](./每阶段新增能力.md)、[系统架构说明](./系统架构与飞书对标说明.md) 保持一致。  
+> 对标飞书 CLI；与 [开发文档](./kuaimai-cli%20开发文档.md)、[meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)、[每阶段新增能力](./每阶段新增能力.md)、[系统架构说明](./系统架构与飞书对标说明.md) 保持一致。  
 > **当前业务验收基准**：**erp-items-core 商品域**，以 **商品标题查改** 为核心场景（`item +list` → `save`）。
 
 ---
@@ -34,7 +34,7 @@
 ### 3.1 架构（硬性）
 
 - [ ] 目录符合白皮书：`cmd/`、`internal/`、`shortcuts/`、`internal/registry/`、`scripts/fetch_meta/`
-- [ ] `skills/` 仅 `SKILL.md`，无 Go 业务代码
+- [ ] `skills/` 含 `SKILL.md` 与 `references/` 工作流文档，无 Go 业务代码
 - [ ] 业务逻辑在 `shortcuts/`，`cmd` 仅注册与参数
 - [ ] stderr 日志 / stdout 结构化数据分离
 - [ ] 输出 `{ok,data,error,hint}`
@@ -101,17 +101,27 @@ kuaimai-cli api POST /item/stock/queryCount --body '{}' --output json --verbose
 
 - [ ] `shortcuts/common/runner` 可用
 - [ ] `meta_data.json` 嵌入，`schema` / `service` 可用
-- [ ] `item` 已在 meta 中注册（当前 v1.2.0，4 operations）
+- [ ] `item` 已在 meta 中注册（当前 **v1.6.0**，**1157** operations；核心 6 个含 `item-query-list-v2`）
 
 ### 4.2 元数据与服务命令
 
 ```bash
-kuaimai-cli schema --output json | jq '.data.services | length'   # 期望 1（item）
-kuaimai-cli service item list --help
-kuaimai-cli service item save --help
+kuaimai-cli schema --output json | jq '.data.version'                    # 期望 1.6.0
+kuaimai-cli schema --output json | jq '.data.operations | length'       # 期望 1157
+kuaimai-cli schema --output json | jq '[.data.operations[] | select(.shortcut != "")] | length'  # 期望 5
+kuaimai-cli service item stock-list --help
+kuaimai-cli service item item-query-list-v2 --help
+kuaimai-cli service item item-save --help
 ```
 
-- [ ] `service item list` 与 shortcuts `item list` 路径一致（`/item/stock/queryList`）
+- [ ] `service item stock-list` 与 shortcuts `item list` 路径一致（`/item/stock/queryList`）
+- [ ] operation 命名为 `模块-操作` 格式（如 `stock-list`，**非** `list`）
+- [ ] `contentType` 仅为 `get_query` / `post_form` / `post_json`
+- [ ] 查询接口 `write:false`；写接口 `write:true` 且 `--dry-run` 可预览
+- [ ] 分页列表 `pageable:true`（`stock-list`、`item-query-list-v2` 等）；`--page-all` 可全量翻页
+- [ ] `--page-limit` 达条数上限后停止并 stderr 提示
+- [ ] `--page-confirm no` 在 500 条阈值处静默停止（可用 mock 或大数据环境）
+- [ ] `requestSchema` / `responseSchema` 已写入（对照 [定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)）
 
 ### 4.3 企业级能力
 
@@ -211,11 +221,15 @@ kuaimai-cli item +list --body '{"title":"CLI验收","pageNo":1,"pageSize":10}' -
 
 ```bash
 kuaimai-cli skill list --output json
-kuaimai-cli skill install kuaimai-item --from ./skills
+kuaimai-cli skill install kuaimai-item
 ```
 
 - [ ] 能列出 `kuaimai-item`、`kuaimai-shared`
-- [ ] `skill install` 写入 `~/.agents/skills/<name>/SKILL.md`
+- [ ] `skill install` 写入 `~/.agents/skills/<name>/` 整目录（`SKILL.md` + `references/`）
+- [ ] `kuaimai-item/references/` 含 **8** 个工作流文档（list、count、get-detail、update-title、save、meta-execution、service、query-list-v2）
+- [ ] `kuaimai-item/SKILL.md` 含 CRITICAL 读 shared、Shortcuts 表、API Resources、快速决策
+- [ ] `kuaimai-shared/SKILL.md` 含 `metadata.cliHelp`，无 item 域长命令模板
+- [ ] `doctor` 检测 `references/` 缺失时提示重装
 
 ### 5.6 多格式输出（需 list 有数据）
 
@@ -240,14 +254,22 @@ kuaimai-cli item +list \
 ### 5.8 分页与审计
 
 ```bash
+# 全量翻页（大数据环境）
 kuaimai-cli item +list \
   --body '{"title":"2026","pageNo":1,"pageSize":50}' \
   --page-all --output json
+
+# 限制条数 + 自动续查（Agent/脚本）
+kuaimai-cli item +list \
+  --body '{"title":"2026","pageNo":1,"pageSize":50}' \
+  --page-all --page-limit 100 --page-confirm yes --output json
 
 cat ~/.kuaimai-cli/audit.log | tail -5
 ```
 
 - [ ] `--page-all` 合并多页（数据量足够时）
+- [ ] `--page-limit 100` 最多返回 100 条
+- [ ] 交互终端达 500 条阈值时提示 `[y/N]`（`--page-confirm prompt`）
 - [ ] `audit.log` 含命令与时间戳
 
 ---
@@ -288,7 +310,7 @@ kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run -
 
 ### 6.4 仍规划
 
-扩展更多 erp 业务域 · 自动替换二进制升级
+扩展更多 curated shortcuts · 自动替换二进制升级 · `--page-delay` · 单 op `schema`
 
 ---
 
@@ -296,7 +318,7 @@ kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run -
 
 1. 阶段一全部通过后再扩展阶段二  
 2. 阶段三以 **item 标题查改** 为业务验收基准  
-3. 新接口：更新 `shortcuts/item` + `meta_data.json` + Skill + 本文档  
+3. 新接口：按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 更新 `shortcuts/item` + `meta_data.json` + Skill + 本文档  
 
 ---
 

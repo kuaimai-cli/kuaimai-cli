@@ -3,10 +3,10 @@ package common
 import (
 	"context"
 
-	"github.com/kuaimai/kuaimai-cli/internal/client"
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/core"
-	"github.com/kuaimai/kuaimai-cli/pkg/logger"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/client"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
 )
 
 // RunGET executes a GET list/detail shortcut.

@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/kuaimai/kuaimai-cli/shortcuts/common"
+	"github.com/kuaimai-cli/kuaimai-cli/shortcuts/common"
 	"github.com/spf13/cobra"
 )
 

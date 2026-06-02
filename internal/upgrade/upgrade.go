@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kuaimai/kuaimai-cli/internal/build"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/build"
 )
 
 const defaultRepo = "kuaimai-cli/kuaimai-cli"

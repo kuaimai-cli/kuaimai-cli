@@ -1,11 +1,11 @@
 package cmdutil
 
 import (
-	"github.com/kuaimai/kuaimai-cli/internal/auth"
-	"github.com/kuaimai/kuaimai-cli/internal/client"
-	"github.com/kuaimai/kuaimai-cli/internal/config"
-	"github.com/kuaimai/kuaimai-cli/internal/core"
-	"github.com/kuaimai/kuaimai-cli/internal/output"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/client"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/output"
 )
 
 // Factory wires config, auth, HTTP client, and output for commands.
@@ -59,5 +59,5 @@ func (e *AuthRequiredError) Error() string {
 }
 
 func (e *AuthRequiredError) Hint() string {
-	return "请先执行 kuaimai-cli auth login <accessToken> 完成登录"
+	return auth.LoginHint
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kuaimai/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
 )
 
 // BusinessError is returned when HTTP succeeds but the API body reports failure (e.g. result=901).

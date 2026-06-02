@@ -1,7 +1,7 @@
 {
   "name": "@kuaimai-cli/cli",
   "version": "0.1.2",
-  "description": "快麦 erp-items-core 商品 CLI（对标飞书 lark-cli 分发模式）",
+  "description": "快麦 erp-items-core 商品 CLI：shortcuts + meta 驱动 service（1157 APIs）、分页防护、Agent Skill。对标 @larksuite/cli 分发。",
   "bin": {
     "kuaimai-cli": "scripts/run.js"
   },

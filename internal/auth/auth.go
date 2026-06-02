@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kuaimai/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
 	"github.com/zalando/go-keyring"
 )
 
@@ -13,6 +13,9 @@ const (
 	serviceName       = "kuaimai-cli"
 	defaultProfile    = "default"
 	HeaderAccessToken = "accessToken" // 快麦业务 API 鉴权请求头
+
+	// LoginHint 引导用户向管理员申请 token 后自行登录（Agent 不可代填）。
+	LoginHint = "accessToken 须由用户提供；如尚未持有，请联系 ERP 管理员申请分配，再执行 kuaimai-cli auth login <accessToken>"
 )
 
 // Store manages token in the OS keychain for one profile.

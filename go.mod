@@ -1,4 +1,4 @@
-module github.com/kuaimai/kuaimai-cli
+module github.com/kuaimai-cli/kuaimai-cli
 
 go 1.22
 

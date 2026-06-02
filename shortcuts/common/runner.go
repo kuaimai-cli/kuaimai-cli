@@ -8,15 +8,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kuaimai/kuaimai-cli/pkg/sanitize"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/sanitize"
 
-	"github.com/kuaimai/kuaimai-cli/internal/audit"
-	"github.com/kuaimai/kuaimai-cli/internal/auth"
-	"github.com/kuaimai/kuaimai-cli/internal/client"
-	"github.com/kuaimai/kuaimai-cli/internal/cmdutil"
-	"github.com/kuaimai/kuaimai-cli/internal/core"
-	"github.com/kuaimai/kuaimai-cli/internal/output"
-	"github.com/kuaimai/kuaimai-cli/pkg/logger"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/audit"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/auth"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/client"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/output"
+	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
 )
 
 // RunFunc performs the business HTTP call and returns data for stdout envelope.
@@ -30,10 +30,19 @@ type ListOptions struct {
 
 // WriteOptions configures write-style shortcut execution with dry-run support.
 type WriteOptions struct {
-	Method       string
-	Path         string
-	Body         any
-	FormEncoded  bool // 与浏览器一致：application/x-www-form-urlencoded
+	Method      string
+	Path        string
+	Body        any
+	FormEncoded bool // 与浏览器一致：application/x-www-form-urlencoded
+	// PageAll 为 nil 时使用全局 --page-all；service 层可设为仅 pageable 操作翻页。
+	PageAll *bool
+}
+
+func (opts WriteOptions) effectivePageAll() bool {
+	if opts.PageAll != nil {
+		return *opts.PageAll
+	}
+	return core.Ctx.PageAll
 }
 
 // Runner executes shortcuts with auth, dry-run, and unified output.
@@ -139,7 +148,7 @@ func (r *Runner) ExecuteWrite(ctx context.Context, opts WriteOptions) error {
 				return nil, fmt.Errorf("form 请求体必须是 map")
 			}
 			_ = audit.Record(auditCommandName(), opts.Method, opts.Path, "request")
-			if core.Ctx.PageAll {
+			if opts.effectivePageAll() {
 				logger.Info("page-all: 自动拉取全部分页（form pageNo/pageSize）")
 				data, err = c.PostFormAllPages(ctx, opts.Path, m)
 			} else {
