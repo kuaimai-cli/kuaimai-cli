@@ -90,7 +90,7 @@ func init() {
 	}
 	rootCmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
 		upgrade.MaybeNotify(cmd)
-		skill.MaybeSyncOnCLIVersionChange(cmd)
+		skill.MaybeAutoSync(cmd)
 	}
 
 	configcmd.Register(rootCmd)

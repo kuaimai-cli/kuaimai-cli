@@ -2,7 +2,7 @@
 
 快麦 ERP **商品（erp-items-core）** 命令行工具 npm 分发包，对标飞书 [`@larksuite/cli`](https://www.npmjs.com/package/@larksuite/cli)。
 
-本包为 **薄壳**：`postinstall` / `run.js` 从 [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载对应平台的 Go 二进制，不将完整 CLI 源码打入 npm。
+本包为 **薄壳**：`postinstall` / `run.js` 从 [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载对应平台的 Go 二进制；失败时自动回退 [npmmirror](https://registry.npmmirror.com) `/-/binary/kuaimai-cli/`（对标 `@larksuite/cli`，须在 [cnpmcore 注册](../docs/npmmirror-二进制镜像.md) 后镜像才可用）。
 
 ## 能力快照
 

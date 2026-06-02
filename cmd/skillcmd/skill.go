@@ -42,10 +42,13 @@ func listCmd() *cobra.Command {
 func installCmd() *cobra.Command {
 	var repo, gitRef string
 	var ifStale bool
+	var force bool
 	c := &cobra.Command{
 		Use:   "install [name...]",
 		Short: "从 GitHub 安装 Skill 到各 Agent 目录（无参数时安装 kuaimai-shared、kuaimai-item）",
-		Long:  "覆盖写入各 Agent 的 skill 目录（不删除其它 skill）。--if-stale 时仅在 Release/CLI 版本变化或未安装时更新。",
+		Long: "覆盖写入各 Agent 的 skill 目录（不删除其它 skill）。\n" +
+			"无参数时默认仅在未安装、Release 或 CLI 版本变化时更新（等同 --if-stale）；" +
+			"任意命令结束后也会在后台自动同步（24h 缓存，见 KUAIMAI_CLI_SKIP_SKILL_SYNC）。",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := cmdutil.NewFactory()
 			if err != nil {
@@ -53,7 +56,8 @@ func installCmd() *cobra.Command {
 			}
 			opts := skill.InstallOptions{Repo: repo, Ref: gitRef}
 
-			if ifStale && len(args) == 0 {
+			useStale := (ifStale || len(args) == 0) && !force
+			if useStale && len(args) == 0 {
 				updated, results, err := skill.InstallIfStale(opts)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, err.Error())
@@ -66,7 +70,7 @@ func installCmd() *cobra.Command {
 					})
 				}
 				return f.Printer().Success(map[string]any{
-					"message": "Skills 已更新（--if-stale）",
+					"message": "Skills 已更新",
 					"stale":   true,
 					"count":   len(results),
 					"skills":  results,
@@ -95,6 +99,7 @@ func installCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&repo, "repo", skill.DefaultGitHubRepo(), "GitHub 仓库（owner/repo）")
 	c.Flags().StringVar(&gitRef, "ref", "main", "GitHub 分支或 tag（--if-stale 时默认用最新 Release tag）")
-	c.Flags().BoolVar(&ifStale, "if-stale", false, "仅在未安装或 Release/CLI 版本变化时安装默认 Skills")
+	c.Flags().BoolVar(&ifStale, "if-stale", false, "仅在未安装或 Release/CLI 版本变化时安装默认 Skills（无参数时已是默认行为）")
+	c.Flags().BoolVar(&force, "force", false, "无参数时强制重装默认 Skills（忽略是否已最新）")
 	return c
 }

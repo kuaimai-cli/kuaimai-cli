@@ -221,7 +221,7 @@ async function stepInstallSkills(msg, { refreshedCLI } = {}) {
       s.stop(msg.step2Skip);
       return;
     }
-    runCLI(["skill", "install"], { timeout: 120000 });
+    runCLI(["skill", "install", "--if-stale"], { timeout: 120000 });
     s.stop(msg.step2Done);
   } catch (_) {
     s.stop(msg.step2Fail);

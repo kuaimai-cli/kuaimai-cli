@@ -14,13 +14,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const skillSyncFile = "skill-sync.json"
+const (
+	skillSyncFile          = "skill-sync.json"
+	defaultSkillCheckInterval = 24 * time.Hour
+)
 
 // SyncState records the last skill sync relative to CLI / release.
 type SyncState struct {
-	CLIVersion string    `json:"cli_version"`
-	ReleaseRef string    `json:"release_ref"`
-	SyncedAt   time.Time `json:"synced_at"`
+	CLIVersion           string    `json:"cli_version"`
+	ReleaseRef           string    `json:"release_ref"`
+	SyncedAt             time.Time `json:"synced_at"`
+	LastReleaseCheckAt   time.Time `json:"last_release_check_at,omitempty"`
+	CachedLatestRelease  string    `json:"cached_latest_release,omitempty"`
 }
 
 func skillSyncPath() string {
@@ -42,7 +47,7 @@ func loadSyncState() (SyncState, error) {
 	return st, nil
 }
 
-func saveSyncState(st SyncState) error {
+func writeSyncState(st SyncState, touchSyncedAt bool) error {
 	dir := util.ConfigDir()
 	if dir == "" {
 		return fmt.Errorf("无法确定配置目录")
@@ -50,7 +55,9 @@ func saveSyncState(st SyncState) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	st.SyncedAt = time.Now()
+	if touchSyncedAt {
+		st.SyncedAt = time.Now()
+	}
 	raw, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return err
@@ -58,29 +65,82 @@ func saveSyncState(st SyncState) error {
 	return os.WriteFile(skillSyncPath(), raw, 0o600)
 }
 
-// NeedsSync reports whether skills should be refreshed for the latest GitHub release.
-func NeedsSync(repo string) (bool, string, error) {
-	ref, err := upgrade.LatestReleaseTag(repo)
-	if err != nil {
-		return false, "", err
-	}
+func saveSyncState(st SyncState) error {
+	return writeSyncState(st, true)
+}
+
+func saveReleaseCheckCache(latest string) error {
 	st, err := loadSyncState()
 	if err != nil {
-		return true, ref, nil
+		st = SyncState{}
 	}
-	if st.ReleaseRef != ref {
-		return true, ref, nil
+	st.LastReleaseCheckAt = time.Now()
+	st.CachedLatestRelease = latest
+	return writeSyncState(st, false)
+}
+
+func latestReleaseRefCached(repo string) (string, error) {
+	st, err := loadSyncState()
+	if err != nil {
+		st = SyncState{}
 	}
+	if st.CachedLatestRelease != "" && time.Since(st.LastReleaseCheckAt) < defaultSkillCheckInterval {
+		return st.CachedLatestRelease, nil
+	}
+	ref, err := upgrade.LatestReleaseTag(repo)
+	if err != nil {
+		return "", err
+	}
+	if err := saveReleaseCheckCache(ref); err != nil {
+		return ref, nil
+	}
+	return ref, nil
+}
+
+func defaultSkillsMissing() (bool, error) {
 	for _, name := range DefaultSkillNames {
 		ok, err := IsInstalled(name)
 		if err != nil {
-			return false, ref, err
+			return false, err
 		}
 		if !ok {
-			return true, ref, nil
+			return true, nil
 		}
 	}
+	return false, nil
+}
+
+// NeedsSync reports whether skills should be refreshed for the latest GitHub release.
+func NeedsSync(repo string) (bool, string, error) {
+	repo = normalizeRepo(repo)
+	if repo == "" {
+		repo = defaultGitHubRepo
+	}
+
+	missing, err := defaultSkillsMissing()
+	if err != nil {
+		return false, "", err
+	}
+	if missing {
+		ref, err := latestReleaseRefCached(repo)
+		return true, ref, err
+	}
+
+	st, err := loadSyncState()
+	if err != nil {
+		ref, err2 := latestReleaseRefCached(repo)
+		return true, ref, err2
+	}
 	if st.CLIVersion != build.Version {
+		ref, err := latestReleaseRefCached(repo)
+		return true, ref, err
+	}
+
+	ref, err := latestReleaseRefCached(repo)
+	if err != nil {
+		return false, "", err
+	}
+	if st.ReleaseRef != ref {
 		return true, ref, nil
 	}
 	return false, ref, nil
@@ -104,7 +164,12 @@ func InstallIfStale(opts InstallOptions) (bool, []InstallResult, error) {
 	if err != nil {
 		return false, results, err
 	}
-	_ = saveSyncState(SyncState{CLIVersion: build.Version, ReleaseRef: ref})
+	st, _ := loadSyncState()
+	st.CLIVersion = build.Version
+	st.ReleaseRef = ref
+	st.LastReleaseCheckAt = time.Now()
+	st.CachedLatestRelease = ref
+	_ = saveSyncState(st)
 	return true, results, nil
 }
 
@@ -122,7 +187,12 @@ func SyncDefaultsAfterUpgrade(releaseRef string, opts InstallOptions) error {
 	if _, err := InstallDefaults(opts); err != nil {
 		return err
 	}
-	return saveSyncState(SyncState{CLIVersion: build.Version, ReleaseRef: releaseRef})
+	st, _ := loadSyncState()
+	st.CLIVersion = build.Version
+	st.ReleaseRef = releaseRef
+	st.LastReleaseCheckAt = time.Now()
+	st.CachedLatestRelease = releaseRef
+	return saveSyncState(st)
 }
 
 // ShouldSkipSkillAutoSync skips background skill sync on selected commands.
@@ -139,29 +209,31 @@ func ShouldSkipSkillAutoSync(cmd *cobra.Command) bool {
 	return false
 }
 
-// MaybeSyncOnCLIVersionChange refreshes skills once when the running CLI version changes.
-func MaybeSyncOnCLIVersionChange(cmd *cobra.Command) {
+// MaybeAutoSync refreshes default skills in the background when missing, CLI
+// version changed, or GitHub release advanced (24h release check cache).
+func MaybeAutoSync(cmd *cobra.Command) {
 	if ShouldSkipSkillAutoSync(cmd) {
 		return
 	}
 	if build.Version == "" || build.Version == "dev" {
 		return
 	}
-	st, err := loadSyncState()
-	if err != nil || st.CLIVersion == build.Version {
-		return
-	}
 	go func() {
-		opts := InstallOptions{Repo: defaultGitHubRepo}
-		ref, err := upgrade.LatestReleaseTag(opts.Repo)
+		updated, _, err := InstallIfStale(InstallOptions{Repo: defaultGitHubRepo})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[kuaimai-cli] Skill 自动同步跳过（查询 Release 失败）: %v\n", err)
+			fmt.Fprintf(os.Stderr,
+				"[kuaimai-cli] Skill 自动同步失败: %v（可运行: kuaimai-cli skill install）\n",
+				err,
+			)
 			return
 		}
-		if err := SyncDefaultsAfterUpgrade(ref, opts); err != nil {
-			fmt.Fprintf(os.Stderr, "[kuaimai-cli] Skill 自动同步失败: %v（可运行: kuaimai-cli skill install --if-stale）\n", err)
-			return
+		if updated {
+			fmt.Fprintf(os.Stderr, "[kuaimai-cli] Skills 已自动同步至最新 Release\n")
 		}
-		fmt.Fprintf(os.Stderr, "[kuaimai-cli] CLI 版本已变更，Skills 已同步至 %s\n", ref)
 	}()
+}
+
+// MaybeSyncOnCLIVersionChange is deprecated; use MaybeAutoSync.
+func MaybeSyncOnCLIVersionChange(cmd *cobra.Command) {
+	MaybeAutoSync(cmd)
 }

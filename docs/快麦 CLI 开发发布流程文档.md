@@ -11,7 +11,7 @@ git tag -d v0.1.5
 # 2. 同步最新代码，提交配置修改
 git add -A
 git reset -- scripts/generate_meta/__pycache__/ scripts/filter_meta/__pycache__/
-git commit -m "fix: 修复goreleaser v2兼容报错，适配vendor编译"
+git commit -m "fix: 修复"
 git push origin main
 
 # 3. 全新升级版本，正式发版
@@ -264,6 +264,10 @@ gh release view v0.1.4 --repo kuaimai-cli/kuaimai-cli
 # 校验NPM是否发布成功
 
 npm view @kuaimai-cli/cli version
+
+# 校验 npmmirror 二进制是否可拉取（国内安装兜底，须先在 cnpmcore 注册，见 docs/npmmirror-二进制镜像.md）
+
+curl -sI "https://registry.npmmirror.com/-/binary/kuaimai-cli/v0.1.9/kuaimai-cli-0.1.9-darwin-amd64.tar.gz" | head -3
 
 4.4 发版失败重置（Tag冲突/报错专用）
 

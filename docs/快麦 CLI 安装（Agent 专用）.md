@@ -13,11 +13,15 @@ npx @kuaimai-cli/cli@latest install
 
 ## 第 2 步 安装必需 Skill
 
-从 GitHub 拉取 **整目录**（`SKILL.md` + `references/` 工作流文档），安装到各 Agent 目录（`~/.agents/skills`、`~/.cursor/skills` 等）：
+从 GitHub 拉取 **整目录**（`SKILL.md` + `references/` 工作流文档），安装到各 Agent 目录（`~/.agents/skills`、`~/.cursor/skills` 等）。
+
+**通常无需手动执行**：任意 `kuaimai-cli` 命令结束后会在后台自动同步（未安装 / Release 更新 / CLI 版本变化时，24h 缓存）。首次安装或需立即拉取时可手动：
 
 ```shell
 kuaimai-cli skill install
 ```
+
+（无参数时仅在需要时更新；强制覆盖请加 `--force`）
 
 默认安装 `kuaimai-shared`（全局约定）与 `kuaimai-item` v2.0.0（商品域）。安装后目录结构示例：
 
@@ -78,12 +82,11 @@ kuaimai-cli upgrade --check-only --output json
 
 **说明**：`~/.kuaimai-cli/` 仅存配置与缓存，**不会**阻止 CLI 升级。若 `npx install` 曾提示「已安装 (v0.1.0)，跳过」而版本未变，请用上面 `upgrade` / 重装；`0.1.8` 起向导会对比 npm 包版本并自动 `npm install -g @kuaimai-cli/cli@<目标版本>`。
 
-CLI 版本变更后，会在后台尝试将 `kuaimai-shared`、`kuaimai-item` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。也可手动：
+CLI 会在后台自动将 `kuaimai-shared`、`kuaimai-item` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。手动检查/触发：
 
 ```shell
-kuaimai-cli skill install
-# 或仅在 Release/CLI 变化时更新
-kuaimai-cli skill install --if-stale
+kuaimai-cli skill install          # 仅在需要时更新（默认）
+kuaimai-cli skill install --force  # 强制覆盖重装
 ```
 
 | 环境变量 | 作用 |
@@ -107,5 +110,7 @@ kuaimai-cli skill install
 ```
 
 **不要**删除 `~/.kuaimai-cli/`（会丢失 `config.yaml` 与 token）。无需 `skill install all`（无此参数；无参数即安装默认 Skills）。
+
+国内若 `npm install` 因 GitHub 超时失败，发版后 `install.js` 会尝试 npmmirror 镜像；镜像须维护者在 [npmmirror 二进制镜像](./npmmirror-二进制镜像.md) 完成 cnpmcore 注册。临时可用代理或本地 `make build`。
 
 安装 Skill 后请 **重新打开 Agent 会话**。更多命令与使用说明，可查阅 [AGENTS.md](../AGENTS.md) 与 [系统架构与飞书对标说明](./系统架构与飞书对标说明.md)。

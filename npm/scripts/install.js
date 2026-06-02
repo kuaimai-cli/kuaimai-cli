@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// 对标 larksuite/cli/scripts/install.js：npm 薄壳 + postinstall 从 GitHub Release 下载 Go 二进制。
-// 差异：暂不启用 npmmirror / registry 二进制镜像（须维护者同步后才可启用，否则 404）。
+// 对标 @larksuite/cli/scripts/install.js：GitHub Release 优先，失败则回退 npmmirror /-/binary/ 镜像。
 
 const fs = require("fs");
 const path = require("path");
@@ -11,11 +10,16 @@ const crypto = require("crypto");
 const VERSION = require("../package.json").version.replace(/-.*$/, "");
 const REPO = "kuaimai-cli/kuaimai-cli";
 const NAME = "kuaimai-cli";
+const BINARY_PKG = "kuaimai-cli";
+const DEFAULT_MIRROR_HOST = "https://registry.npmmirror.com";
 
-// curl --location 会跟随重定向到 objects.githubusercontent.com
+// Allowlist gates the *initial* request URL only. curl --location follows redirects
+// (capped by --max-redirs 3) without re-checking the target host.
 const ALLOWED_HOSTS = new Set([
   "github.com",
   "objects.githubusercontent.com",
+  "registry.npmmirror.com",
+  "cdn.npmmirror.com",
 ]);
 
 const PLATFORM_MAP = {
@@ -40,9 +44,43 @@ const binDir = path.join(__dirname, "..", "bin");
 const dest = path.join(binDir, NAME + (isWindows ? ".exe" : ""));
 const { ensurePackageEntrypoints, ensureExecutable, stripMacOSQuarantine } = require("./permissions");
 
-function getDownloadUrl(env) {
-  const override = (env.KUAIMAI_CLI_DOWNLOAD_URL || "").trim();
-  return override || GITHUB_URL;
+function joinUrl(base, suffix) {
+  return base.replace(/\/+$/, "") + suffix;
+}
+
+function isValidDownloadBase(raw) {
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "https:" && !!parsed.hostname;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isDefaultNpmjsRegistry(url) {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "registry.npmjs.org";
+  } catch (_) {
+    return false;
+  }
+}
+
+/** @param {NodeJS.ProcessEnv} env */
+function resolveMirrorUrls(env, archive, version) {
+  if (env.KUAIMAI_CLI_SKIP_MIRROR === "1") return [];
+
+  const binaryPath = `/-/binary/${BINARY_PKG}/v${version}/${archive}`;
+  const defaultUrl = joinUrl(DEFAULT_MIRROR_HOST, binaryPath);
+
+  const urls = [];
+  const registry = (env.npm_config_registry || "").trim();
+  if (registry && !isDefaultNpmjsRegistry(registry) && isValidDownloadBase(registry)) {
+    const base = new URL(registry);
+    urls.push(joinUrl(base.origin + base.pathname, binaryPath));
+  }
+  if (!urls.includes(defaultUrl)) urls.push(defaultUrl);
+  return urls;
 }
 
 function assertAllowedHost(url) {
@@ -54,6 +92,52 @@ function assertAllowedHost(url) {
 
 function envAllowHost(hostname) {
   return process.env.KUAIMAI_CLI_ALLOW_DOWNLOAD_HOST === hostname;
+}
+
+/** @param {NodeJS.ProcessEnv} env */
+function getDownloadUrlChain(env) {
+  const override = (env.KUAIMAI_CLI_DOWNLOAD_URL || "").trim();
+  if (override) {
+    assertAllowedHost(override);
+    return [override];
+  }
+
+  const mirrorUrls = resolveMirrorUrls(env, archiveName, VERSION);
+  for (const u of mirrorUrls) {
+    try {
+      ALLOWED_HOSTS.add(new URL(u).hostname);
+    } catch (_) {
+      /* ignore malformed mirror */
+    }
+  }
+  return [GITHUB_URL, ...mirrorUrls];
+}
+
+function isCurlVersionSupported(versionOutput) {
+  const match = String(versionOutput).match(/^\s*curl\s+(\d+)\.(\d+)\.(\d+)/i);
+  if (!match) return false;
+  const major = parseInt(match[1], 10);
+  const minor = parseInt(match[2], 10);
+  return major > 7 || (major === 7 && minor >= 70);
+}
+
+let _curlSupportsSslRevokeBestEffort;
+
+function curlSupportsSslRevokeBestEffort() {
+  if (_curlSupportsSslRevokeBestEffort !== undefined) {
+    return _curlSupportsSslRevokeBestEffort;
+  }
+  try {
+    const output = execFileSync("curl", ["--version"], {
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    _curlSupportsSslRevokeBestEffort = isCurlVersionSupported(output);
+  } catch (_) {
+    _curlSupportsSslRevokeBestEffort = false;
+  }
+  return _curlSupportsSslRevokeBestEffort;
 }
 
 function download(url, destPath) {
@@ -72,7 +156,9 @@ function download(url, destPath) {
     "--output",
     destPath,
   ];
-  if (isWindows) args.unshift("--ssl-revoke-best-effort");
+  if (isWindows && curlSupportsSslRevokeBestEffort()) {
+    args.unshift("--ssl-revoke-best-effort");
+  }
   args.push(url);
   execFileSync("curl", args, { stdio: ["ignore", "ignore", "pipe"] });
 }
@@ -104,9 +190,7 @@ function extractZipWindows(archivePath, destDir) {
       } catch (fallbackErr) {
         throw new Error(
           `Failed to extract ${archivePath}. ` +
-            `.NET ZipFile: ${primaryErr.message}; ` +
-            `Expand-Archive: ${secondErr.message}; ` +
-            `tar: ${fallbackErr.message}`
+            `ZipFile: ${primaryErr.message}; Expand-Archive: ${secondErr.message}; tar: ${fallbackErr.message}`
         );
       }
     }
@@ -127,8 +211,8 @@ function getExpectedChecksum(archive) {
     const idx = trimmed.indexOf(" ");
     if (idx === -1) continue;
     const hash = trimmed.slice(0, idx);
-    const name = trimmed.slice(idx + 2);
-    if (name === archive) return hash;
+    const fileName = trimmed.slice(idx + 2);
+    if (fileName === archive) return hash;
   }
 
   throw new Error(`Checksum entry not found for ${archive}`);
@@ -156,19 +240,33 @@ function verifyChecksum(archivePath, expectedHash) {
   }
 }
 
+function downloadWithFallback(urls) {
+  let lastErr;
+  for (const url of urls) {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kuaimai-cli-"));
+    const archivePath = path.join(tmpDir, archiveName);
+    try {
+      download(url, archivePath);
+      return { archivePath, tmpDir, sourceUrl: url };
+    } catch (e) {
+      lastErr = e;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+  throw lastErr;
+}
+
 function install() {
   if (!platform || !arch) {
     throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
   }
 
-  const downloadUrl = getDownloadUrl(process.env);
+  const downloadUrls = getDownloadUrlChain(process.env);
   fs.mkdirSync(binDir, { recursive: true });
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kuaimai-cli-"));
-  const archivePath = path.join(tmpDir, archiveName);
+  const { archivePath, tmpDir, sourceUrl } = downloadWithFallback(downloadUrls);
 
   try {
-    download(downloadUrl, archivePath);
     verifyChecksum(archivePath, getExpectedChecksum(archiveName));
 
     if (isWindows) {
@@ -182,37 +280,46 @@ function install() {
     ensureExecutable(dest);
     stripMacOSQuarantine(dest);
     ensurePackageEntrypoints(path.join(__dirname, ".."));
-    console.log(`${NAME} v${VERSION} installed successfully`);
+
+    const viaMirror = sourceUrl !== GITHUB_URL && !process.env.KUAIMAI_CLI_DOWNLOAD_URL;
+    const mirrorNote = viaMirror ? " (mirror)" : "";
+    console.log(`${NAME} v${VERSION} installed successfully${mirrorNote}`);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
-function formatInstallError(err, downloadUrl) {
+function formatInstallError(err, downloadUrls) {
   const releasePage = `https://github.com/${REPO}/releases/tag/v${VERSION}`;
+  const urls = Array.isArray(downloadUrls) ? downloadUrls : [downloadUrls];
   return [
     err && err.message ? err.message : "download failed",
     "",
-    `Source: GitHub Release only (same as @larksuite/cli, without npmmirror fallback)`,
-    `URL: ${downloadUrl}`,
+    "Tried (in order):",
+    ...urls.map((u) => `  - ${u}`),
     "",
     "If you are behind a firewall or in a restricted network, try one of:",
     "  # 1. Use a proxy:",
     "  export https_proxy=http://your-proxy:port",
     "  npm install -g @kuaimai-cli/cli",
     "",
-    "  # 2. Manual install from Release:",
+    "  # 2. Local build from source:",
+    "  git clone https://github.com/kuaimai-cli/kuaimai-cli.git && cd kuaimai-cli",
+    "  make build && cp ./kuaimai-cli $(npm prefix -g)/bin/",
+    "",
+    "  # 3. Manual install from Release:",
     `  open ${releasePage}`,
     `  download ${archiveName}, extract, and put kuaimai-cli on your PATH`,
     "",
-    "  # 3. Point install.js at a mirror you control:",
+    "  # 4. Custom download URL:",
     `  export KUAIMAI_CLI_DOWNLOAD_URL="<url-to-${archiveName}>"`,
     "  npm install -g @kuaimai-cli/cli",
+    "",
+    "  # 5. npmmirror binary sync (maintainers): see docs/npmmirror-二进制镜像.md",
   ].join("\n");
 }
 
 if (require.main === module) {
-  // npx … install 向导不需要二进制；run.js 会以 KUAIMAI_CLI_RUN=1 触发下载
   const isNpxPostinstall =
     process.env.npm_command === "exec" && !process.env.KUAIMAI_CLI_RUN;
 
@@ -220,10 +327,11 @@ if (require.main === module) {
     process.exit(0);
   }
 
+  const downloadUrls = getDownloadUrlChain(process.env);
   try {
     install();
   } catch (err) {
-    console.error(`Failed to install ${NAME}:\n${formatInstallError(err, getDownloadUrl(process.env))}`);
+    console.error(`Failed to install ${NAME}:\n${formatInstallError(err, downloadUrls)}`);
     process.exit(1);
   }
 }
@@ -232,6 +340,8 @@ module.exports = {
   install,
   GITHUB_URL,
   archiveName,
+  getDownloadUrlChain,
+  resolveMirrorUrls,
   getExpectedChecksum,
   verifyChecksum,
 };

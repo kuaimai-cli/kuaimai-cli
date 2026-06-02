@@ -4,7 +4,14 @@
 
 ## Unreleased
 
+### Changed
+
+- **Skill 自动同步**：任意命令结束后后台执行 `install --if-stale` 逻辑（未安装 / Release 更新 / CLI 版本变化，24h Release 查询缓存）；`skill install` 无参数时默认等同 `--if-stale`，强制重装用 `--force`
+
 ### Fixed
+
+- **npm `install.js` 双源下载（对标 @larksuite/cli）**：GitHub Release 失败后自动尝试 `registry.npmmirror.com/-/binary/kuaimai-cli/...`；支持 `KUAIMAI_CLI_SKIP_MIRROR`、`KUAIMAI_CLI_DOWNLOAD_URL`
+- 维护说明见 [npmmirror 二进制镜像](./docs/npmmirror-二进制镜像.md)（须在 cnpmcore 注册后镜像才可用）
 
 - **npm 安装向导**：全局已存在旧版 `@kuaimai-cli/cli` 时不再一律跳过；对比向导包版本后自动 `npm install -g @kuaimai-cli/cli@<版本>`，并刷新各安装目录下 Go 二进制；CLI 升级后强制重跑 `skill install`
 - 环境变量 `KUAIMAI_CLI_FORCE_INSTALL=1` 可强制重装全局包与 Skills
