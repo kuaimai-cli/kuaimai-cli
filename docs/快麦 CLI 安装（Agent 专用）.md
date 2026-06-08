@@ -5,17 +5,22 @@
 开始安装之前，请确保环境中已安装：
 - Node.js 16+（含 npm/npx）
 
-## 第 1 步 安装 CLI 本体
+## 第 1 步 安装 CLI 与 Skills（一条命令）
+
 ```shell
-# 安装快麦 CLI 命令行工具
+# 安装快麦 CLI + Skills + 初始化配置（Skills 从 npm 包内置目录复制，无需 GitHub Token）
 npx @kuaimai-cli/cli@latest install
 ```
 
-## 第 2 步 安装必需 Skill
+向导会依次：全局安装 CLI → 从 npm 包内 `skills/` 复制到各 Agent 目录 → `config init` → 提示登录。
 
-从 GitHub 拉取 **整目录**（`SKILL.md` + `references/` 工作流文档），安装到各 Agent 目录（`~/.agents/skills`、`~/.cursor/skills` 等）。
+## 第 2 步 Skills 说明（通常无需手动执行）
 
-**通常无需手动执行**：任意 `kuaimai-cli` 命令结束后会在后台自动同步（未安装 / Release 更新 / CLI 版本变化时，24h 缓存）。首次安装或需立即拉取时可手动：
+Skills（`SKILL.md` + `references/`）**随 npm 包 `@kuaimai-cli/cli` 一起发布**，安装向导会从包内复制到 `~/.agents/skills`、`~/.cursor/skills` 等目录。**不需要 GitHub Token**，也不依赖 GitHub API。
+
+`kuaimai-cli skill install` 同样**优先**使用 npm 包或本地仓库内的 `skills/`；仅在没有 bundled 源时才回退 GitHub。
+
+**通常无需手动执行**：任意 `kuaimai-cli` 命令结束后会在后台自动同步（未安装 / CLI 版本变化时）。首次安装或需立即覆盖时可手动：
 
 ```shell
 kuaimai-cli skill install
@@ -96,7 +101,7 @@ kuaimai-cli upgrade --check-only --output json
 
 **说明**：`~/.kuaimai-cli/` 仅存配置与缓存，**不会**阻止 CLI 升级。若 `npx install` 曾提示「已安装 (v0.1.0)，跳过」而版本未变，请用上面 `upgrade` / 重装；`0.1.8` 起向导会对比 npm 包版本并自动 `npm install -g @kuaimai-cli/cli@<目标版本>`。
 
-CLI 会在后台自动将 `kuaimai-shared`、`kuaimai-item`、`kuaimai-scm` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。手动检查/触发：
+CLI 会在后台自动将 `kuaimai-shared`、`kuaimai-item`、`kuaimai-scm` 同步至与 CLI 一致的 bundled 版本（状态见 `~/.kuaimai-cli/skill-sync.json`）。手动检查/触发：
 
 ```shell
 kuaimai-cli skill install          # 仅在需要时更新（默认）
@@ -106,6 +111,7 @@ kuaimai-cli skill install kuaimai-scm  # 仅重装供应链 Skill
 
 | 环境变量 | 作用 |
 |----------|------|
+| `KUAIMAI_CLI_SKILLS_DIR` | 指定 bundled skills 目录（默认自动检测 npm 包内 `skills/`） |
 | `KUAIMAI_CLI_SKIP_UPDATE_CHECK=1` | 禁用「新版本」stderr 提示 |
 | `KUAIMAI_CLI_SKIP_SKILL_SYNC=1` | 禁用 CLI 版本变更后的 Skill 自动同步 |
 | `KUAIMAI_CLI_FORCE_INSTALL=1` | 安装向导强制重装全局包与 Skills（忽略「已安装」跳过） |
@@ -126,6 +132,6 @@ kuaimai-cli skill install
 
 **不要**删除 `~/.kuaimai-cli/`（会丢失 `config.yaml` 与 token）。无需 `skill install all`（无此参数；无参数即安装默认 Skills）。
 
-国内若 `npm install` 因 GitHub 超时失败，发版后 `install.js` 会尝试 npmmirror 镜像；镜像须维护者在 [npmmirror 二进制镜像](./npmmirror-二进制镜像.md) 完成 cnpmcore 注册。临时可用代理或本地 `make build`。
+国内若 `npm install` 因 GitHub 超时失败，发版后 `install.js` 会尝试 npmmirror 镜像（**仅 CLI 二进制**）；Skills 已随 npm 包分发，**不再依赖 GitHub API**。镜像说明见 [npmmirror 二进制镜像](./npmmirror-二进制镜像.md)。
 
 安装 Skill 后请 **重新打开 Agent 会话**。更多命令与使用说明，可查阅 [AGENTS.md](../AGENTS.md) 与 [系统架构与飞书对标说明](./系统架构与飞书对标说明.md)。

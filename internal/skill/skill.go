@@ -39,7 +39,7 @@ type InstallResult struct {
 	Paths []string `json:"paths"`
 }
 
-// InstallOptions configures skill install (GitHub only).
+// InstallOptions configures skill install (bundled npm/repo skills first, GitHub fallback).
 type InstallOptions struct {
 	Repo string
 	Ref  string
@@ -172,7 +172,8 @@ func HasReferences(name string) (bool, error) {
 	return false, nil
 }
 
-// Install downloads the full skill directory from GitHub and installs into all agent skill roots.
+// Install installs the full skill directory into all agent skill roots.
+// Prefers bundled skills shipped with the npm package or repo; falls back to GitHub.
 func Install(name string, opts InstallOptions) (InstallResult, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -180,6 +181,11 @@ func Install(name string, opts InstallOptions) (InstallResult, error) {
 	}
 	if strings.Contains(name, "/") || strings.Contains(name, "..") {
 		return InstallResult{}, fmt.Errorf("skill 名称不合法")
+	}
+	if root, ok := BundledSkillsRoot(); ok {
+		if _, err := os.Stat(filepath.Join(root, name, "SKILL.md")); err == nil {
+			return installFromBundled(root, name)
+		}
 	}
 	repo := normalizeRepo(opts.Repo)
 	if repo == "" {
@@ -208,7 +214,7 @@ func Install(name string, opts InstallOptions) (InstallResult, error) {
 	return InstallResult{Name: name, Paths: paths}, nil
 }
 
-// InstallDefaults installs DefaultSkillNames from GitHub.
+// InstallDefaults installs DefaultSkillNames (bundled first, GitHub fallback).
 func InstallDefaults(opts InstallOptions) ([]InstallResult, error) {
 	var out []InstallResult
 	for _, name := range DefaultSkillNames {

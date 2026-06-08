@@ -110,32 +110,47 @@ func defaultSkillsMissing() (bool, error) {
 	return false, nil
 }
 
-// NeedsSync reports whether skills should be refreshed for the latest GitHub release.
+// NeedsSync reports whether skills should be refreshed (bundled npm/repo or GitHub release).
 func NeedsSync(repo string) (bool, string, error) {
-	repo = normalizeRepo(repo)
-	if repo == "" {
-		repo = defaultGitHubRepo
-	}
-
 	missing, err := defaultSkillsMissing()
 	if err != nil {
 		return false, "", err
 	}
 	if missing {
+		if ref, ok := bundledSyncRef(); ok {
+			return true, ref, nil
+		}
 		ref, err := latestReleaseRefCached(repo)
 		return true, ref, err
 	}
 
 	st, err := loadSyncState()
 	if err != nil {
+		if ref, ok := bundledSyncRef(); ok {
+			return true, ref, nil
+		}
 		ref, err2 := latestReleaseRefCached(repo)
 		return true, ref, err2
 	}
 	if st.CLIVersion != build.Version {
+		if ref, ok := bundledSyncRef(); ok {
+			return true, ref, nil
+		}
 		ref, err := latestReleaseRefCached(repo)
 		return true, ref, err
 	}
 
+	if ref, ok := bundledSyncRef(); ok {
+		if st.ReleaseRef != ref {
+			return true, ref, nil
+		}
+		return false, ref, nil
+	}
+
+	repo = normalizeRepo(repo)
+	if repo == "" {
+		repo = defaultGitHubRepo
+	}
 	ref, err := latestReleaseRefCached(repo)
 	if err != nil {
 		return false, "", err
@@ -144,6 +159,16 @@ func NeedsSync(repo string) (bool, string, error) {
 		return true, ref, nil
 	}
 	return false, ref, nil
+}
+
+func bundledSyncRef() (string, bool) {
+	if _, ok := BundledSkillsRoot(); !ok {
+		return "", false
+	}
+	if build.Version == "" || build.Version == "dev" {
+		return "bundled", true
+	}
+	return build.Version, true
 }
 
 // InstallIfStale installs default skills when missing or release ref changed.
@@ -210,7 +235,7 @@ func ShouldSkipSkillAutoSync(cmd *cobra.Command) bool {
 }
 
 // MaybeAutoSync refreshes default skills in the background when missing, CLI
-// version changed, or GitHub release advanced (24h release check cache).
+// version changed, or bundled/npm skills / GitHub release advanced.
 func MaybeAutoSync(cmd *cobra.Command) {
 	if ShouldSkipSkillAutoSync(cmd) {
 		return

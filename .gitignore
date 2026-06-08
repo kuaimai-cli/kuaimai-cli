@@ -32,3 +32,4 @@ go.work.sum
 npm/node_modules/
 npm/.npm-cache/
 npm/.cache/
+npm/skills/

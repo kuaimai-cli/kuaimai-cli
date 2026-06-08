@@ -95,15 +95,12 @@ kuaimai-cli auth logout
 ## 安装与更新
 
 ```bash
-# 安装 CLI（任选其一）
+# 安装 CLI + Skills（推荐；Skills 从 npm 包内置目录复制，无需 GitHub Token）
 npx @kuaimai-cli/cli@latest install
 # 或: go install github.com/kuaimai-cli/kuaimai-cli@latest
 
-# 安装 Skills（整目录：SKILL.md + references/）
-kuaimai-cli skill install
-kuaimai-cli skill install kuaimai-item
-kuaimai-cli skill install kuaimai-scm
-kuaimai-cli skill list --output json
+# 单独重装 Skills（优先 bundled，回退 GitHub）
+kuaimai-cli skill install --force
 
 # 自检与版本
 kuaimai-cli doctor --output json
@@ -140,7 +137,7 @@ kuaimai-cli schema --output json   # 全量 meta（item + scm）
 | 提示未登录 / 401 | `auth status` → 提示用户向 ERP 管理员申请 accessToken → 引导 `auth login` |
 | `ok: false` 且无网络错误 | 读 `error`、`hint`；必要时加 `--verbose` 重试 |
 | 命令找不到 | 检查 `KUAIMAI_CLI` / PATH / `npx @kuaimai-cli/cli` 是否已安装 |
-| Skill 行为不符合预期 | `skill install` 或 `skill install --if-stale` 覆盖重装，并重开 Agent；`kuaimai-item` 需含 `references/` |
+| Skill 行为不符合预期 | `skill install --force` 或 `npx @kuaimai-cli/cli@latest install` 覆盖重装，并重开 Agent |
 | CLI 版本过旧 | `kuaimai-cli upgrade`（默认一键）；或 `npx @kuaimai-cli/cli@latest install` |
 
 ## 域 Skill 路由

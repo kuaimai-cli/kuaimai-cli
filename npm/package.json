@@ -6,7 +6,8 @@
     "kuaimai-cli": "scripts/run.js"
   },
   "scripts": {
-    "postinstall": "node scripts/install.js"
+    "postinstall": "node scripts/install.js",
+    "prepublishOnly": "node scripts/sync-skills.js"
   },
   "os": [
     "darwin",
@@ -28,9 +29,12 @@
   "files": [
     "scripts/install.js",
     "scripts/install-wizard.js",
+    "scripts/install-skills.js",
+    "scripts/sync-skills.js",
     "scripts/version.js",
     "scripts/permissions.js",
     "scripts/run.js",
+    "skills",
     "checksums.txt"
   ],
   "dependencies": {

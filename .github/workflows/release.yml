@@ -80,6 +80,9 @@ jobs:
             fs.writeFileSync('npm/package.json', JSON.stringify(pkg, null, 2) + '\n');
           " "$VERSION"
 
+      - name: Bundle skills into npm package
+        run: node npm/scripts/sync-skills.js
+
       - name: Publish to npm
         working-directory: npm
         run: npm publish --access public

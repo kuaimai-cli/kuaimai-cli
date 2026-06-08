@@ -10,6 +10,7 @@ const TARGET_VERSION = require("../package.json").version.replace(/-.*$/, "");
 const isWindows = process.platform === "win32";
 const { ensureExecutable, ensurePackageEntrypoints } = require("./permissions");
 const { normalizeVer, versionLess } = require("./version");
+const { installBundledSkills } = require("./install-skills");
 
 const messages = {
   zh: {
@@ -23,7 +24,7 @@ const messages = {
     step2Skip: "Skills 已安装，跳过",
     step2Spinner: "正在安装 Skills...",
     step2Done: "Skills 已安装",
-    step2Fail: "Skills 安装失败。运行: kuaimai-cli skill install",
+    step2Fail: "Skills 安装失败。请重试 npx @kuaimai-cli/cli@latest install 或 kuaimai-cli skill install --force",
     step3: "正在初始化配置...",
     step3Skip: "跳过配置",
     step3Done: "配置已初始化",
@@ -204,24 +205,16 @@ async function stepInstallGlobally(msg) {
   }
 }
 
-async function skillsAlreadyInstalled() {
-  try {
-    const out = runCLI(["skill", "list", "--output", "json"], { timeout: 30000 });
-    return /kuaimai-item/.test(out.toString());
-  } catch (_) {
-    return false;
-  }
-}
-
 async function stepInstallSkills(msg, { refreshedCLI } = {}) {
   const s = p.spinner();
   s.start(msg.step2Spinner);
   try {
-    if (!refreshedCLI && !forceInstall() && (await skillsAlreadyInstalled())) {
+    const force = refreshedCLI || forceInstall();
+    const result = installBundledSkills({ force });
+    if (result.skipped) {
       s.stop(msg.step2Skip);
       return;
     }
-    runCLI(["skill", "install", "--if-stale"], { timeout: 120000 });
     s.stop(msg.step2Done);
   } catch (_) {
     s.stop(msg.step2Fail);
