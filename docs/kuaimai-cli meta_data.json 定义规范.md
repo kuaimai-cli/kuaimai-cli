@@ -1,6 +1,6 @@
 kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
-**适用范围**：erp-items-core 商品域接口
+**适用范围**：erp-items-core 商品域（`item`）、erp-scm 供应链域（`scm`）
 
 **对标标准**：飞书 lark-cli openapi 规范
 
@@ -16,18 +16,21 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 ```json
 {
-  "version": "1.2.0",
+  "version": "1.7.0",
   "services": {
     "item": {
-      "summary": "服务简述",
-      "description": "服务详细说明",
-      "operations": {
-        "业务唯一接口标识": {}
-      }
+      "summary": "快麦ERP商品服务",
+      "description": "商品管理、库存、查询、编辑、上下架",
+      "operations": { }
+    },
+    "scm": {
+      "summary": "快麦ERP供应链服务",
+      "description": "供应链管理：员工、商品中心、操作日志、平台铺货配置",
+      "baseUrl": "https://scm.superboss.cc/",
+      "operations": { }
     }
   }
 }
-
 ```
 
 ### 顶层字段说明
@@ -37,7 +40,9 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 | ------------- | --------------------------------- |
 | `version`     | 元数据文件版本号，用于版本兼容、格式校验              |
 | `services`    | 业务服务集合，按 ERP 业务域分组管理所有接口          |
-| `item`        | 商品业务域唯一固定标识，对应后端 `erp-items-core` |
+| `item`        | 商品业务域，对应 **erp-items-core** |
+| `scm`         | 供应链业务域，对应 **erp-scm**；须含 `baseUrl` |
+| `baseUrl`     | （scm 等独立域名）CLI 请求根地址；item 域用 config `api.url` |
 | `summary`     | 业务域简短描述                           |
 | `description` | 业务域详细功能说明                         |
 | `operations`  | 当前业务域下所有接口集合，单个 key 对应一条后端原子接口    |
@@ -49,8 +54,10 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 ### 1. service 名称
 
-- 固定取值：`item`
-- 对应后端工程：`erp-items-core` 商品业务域
+| service | 后端工程 | API 根地址 |
+|---------|----------|------------|
+| `item`  | erp-items-core | config `api.url`（默认 erp1.superboss.cc） |
+| `scm`   | erp-scm        | meta `baseUrl`（`https://scm.superboss.cc/`） |
 
 ### 2. operation 接口标识命名规则（解决后续接口重复问题）
 
@@ -130,7 +137,16 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 ### 8. summary 接口描述
 
-填写接口功能简述，用于 CLI 列表展示、AI 识别接口能力、文档自省。
+- 填写**中文**功能简述，用于 CLI 列表展示、AI 识别接口能力
+- 优先来源：`@ApiOperation(value=...)` → 方法 Javadoc → 禁止类头注释（Created by / Copyright）
+- 示例：`"summary": "铺货日志分页查询"`、`"summary": "一键应用品牌配置"`
+
+### 9. requestSchema 字段 desc 规范
+
+- `desc` 须为可读中文说明，**禁止**仅重复字段名（如 `"desc": "shopType"`）
+- 优先来源：`@ApiModelProperty` → 字段 Javadoc → `scripts/normalize_meta/normalize_scm_meta.py` 中 `FIELD_DESC_MAP`
+- 分页字段须含 `default`：`pageNo` 默认 1，`pageSize` 默认 50
+- 分页接口 `required` 须含 `pageNo`、`pageSize`；日志类接口须含 `startTime`、`endTime`（若存在）
 
 ---
 
@@ -249,19 +265,21 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 ---
 
-## 六、与代码实现对齐说明（2026-06-02）
+## 六、与代码实现对齐说明（2026-06-08）
 
 | 决策项 | 采用方案 |
 |--------|----------|
 | JSON 结构 | `services` / `operations` 均为**对象 map**（与本规范 §一 一致） |
-| 当前版本 | **v1.6.0**；`generated_at` 可选 |
-| 登记范围 | **1** 个 service `item`，**1157** 个 operation（erp-items-core `/item` Controller，经 `scripts/filter_meta/` 过滤） |
+| 当前版本 | **v1.7.0**；`generated_at` 可选（当前 2026-06-08） |
+| 登记范围 | `item` **1095** 个 operation（erp-items-core）；`scm` **195** 个 operation（erp-scm staff/logging/item/dsb） |
+| scm 生成 | `python3 scripts/generate_meta/generate_scm_meta.py` → 自动调用 `normalize_scm_meta.py` |
+| scm baseUrl | `service scm` 使用 meta `baseUrl`，**不**读 config `api.url` |
 | operation 命名 | meta + `service` 使用 `stock-list` 等；**shortcuts** 仍为 `item +list` / `get-detail` 等（见 `schema` 输出 `shortcut` 字段） |
 | `write` | **业务读写**：查询 `false`，写接口 `true`；`--dry-run` 仅对 `write:true` 生效 |
-| `pageable` | 仅 `pageable:true` 且用户传 `--page-all` 时全量翻页；**68** 个 operation 为 true |
+| `pageable` | 仅 `pageable:true` 且用户传 `--page-all` 时全量翻页；item **60** + scm **41** 个为 true |
 | 分页防护 | `--page-limit` · `--page-confirm`（500/1000 阈值）；硬上限 1000 页 |
 | Schema | `requestSchema` / `responseSchema` 已写入 meta；`service` 做 **required 轻校验**；`schema` 命令输出完整结构 |
-| 双轨 | Agent **优先 shortcuts**；`meta_data.json` 驱动 `service item <op>` 原子兜底，path 须一致 |
+| 双轨 | item：Agent **优先 shortcuts** + `service item` 兜底；scm：**仅** `service scm`（无 shortcuts） |
 
 `operation` 命名：`模块-路径` 小写短横线；CLI **核心 6 个**（5 shortcut + 1 service-only）：`stock-list`、`stock-count`、`item-query-list-v2`、`item-detail`、`item-save`、`item-update-title`。请求 Schema 优先 erp-items-core 入参类，缺失从 erp-core 补；保存商品为 `SysItemModel`。
 
@@ -280,6 +298,9 @@ python3 scripts/normalize_meta/normalize_meta.py   # 若存在
 kuaimai-cli service item stock-list --body '{"title":"test","pageNo":1,"pageSize":50}'
 kuaimai-cli service item item-query-list-v2 --body '{"title":"test","pageNo":1,"pageSize":50}'
 kuaimai-cli service item item-detail --body '{"sysItemId":123}'
+kuaimai-cli service scm staff-query --body '{"pageNo":1,"pageSize":20}'
+kuaimai-cli service scm logging-publish-log \
+  --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}'
 kuaimai-cli schema --output json
 kuaimai-cli item +list --body '{"title":"test"}' --page-all --page-limit 200 --page-confirm yes
 ```

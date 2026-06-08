@@ -24,8 +24,9 @@ type RunFunc func(ctx context.Context, c *client.Client) (any, error)
 
 // ListOptions configures list-style shortcut execution.
 type ListOptions struct {
-	Method string
-	Path   string
+	Method  string
+	Path    string
+	BaseURL string
 }
 
 // WriteOptions configures write-style shortcut execution with dry-run support.
@@ -34,6 +35,7 @@ type WriteOptions struct {
 	Path        string
 	Body        any
 	FormEncoded bool // 与浏览器一致：application/x-www-form-urlencoded
+	BaseURL     string
 	// PageAll 为 nil 时使用全局 --page-all；service 层可设为仅 pageable 操作翻页。
 	PageAll *bool
 }
@@ -57,6 +59,15 @@ func NewRunner(f *cmdutil.Factory) *Runner {
 
 // Execute runs the shortcut pipeline.
 func (r *Runner) Execute(ctx context.Context, fn RunFunc) error {
+	return r.execute(ctx, "", fn)
+}
+
+// ExecuteWithBase runs the pipeline against an optional service-specific base URL.
+func (r *Runner) ExecuteWithBase(ctx context.Context, baseURL string, fn RunFunc) error {
+	return r.execute(ctx, baseURL, fn)
+}
+
+func (r *Runner) execute(ctx context.Context, baseURL string, fn RunFunc) error {
 	p := r.Factory.Printer()
 
 	if err := r.Factory.RequireAuth(); err != nil {
@@ -76,6 +87,7 @@ func (r *Runner) Execute(ctx context.Context, fn RunFunc) error {
 		_ = p.Fail(err.Error(), "请检查配置")
 		return err
 	}
+	httpClient = r.clientWithBase(httpClient, baseURL)
 
 	data, err := fn(ctx, httpClient)
 	if err != nil {
@@ -86,13 +98,20 @@ func (r *Runner) Execute(ctx context.Context, fn RunFunc) error {
 	return p.Success(data)
 }
 
+func (r *Runner) clientWithBase(c *client.Client, baseURL string) *client.Client {
+	if baseURL == "" || c == nil {
+		return c
+	}
+	return c.WithBaseURL(baseURL)
+}
+
 // ExecuteList runs a list command with optional --page-all pagination.
 func (r *Runner) ExecuteList(ctx context.Context, opts ListOptions) error {
 	method := opts.Method
 	if method == "" {
 		method = "GET"
 	}
-	return r.Execute(ctx, func(ctx context.Context, c *client.Client) (any, error) {
+	return r.execute(ctx, opts.BaseURL, func(ctx context.Context, c *client.Client) (any, error) {
 		if core.Ctx.PageAll {
 			logger.Info("page-all: 自动拉取全部分页")
 			data, err := c.RequestAllPages(ctx, method, opts.Path, nil)
@@ -114,10 +133,11 @@ func (r *Runner) ExecuteWrite(ctx context.Context, opts WriteOptions) error {
 	method := strings.ToUpper(opts.Method)
 	if core.Ctx.DryRun {
 		p := r.Factory.Printer()
-		fullURL := opts.Path
-		if cfg := r.Factory.Config; cfg != nil {
-			fullURL = client.ResolveAPIURL(cfg.APIURL(), opts.Path)
+		apiBase := opts.BaseURL
+		if apiBase == "" && r.Factory.Config != nil {
+			apiBase = r.Factory.Config.APIURL()
 		}
+		fullURL := client.ResolveAPIURL(apiBase, opts.Path)
 		out := map[string]any{
 			"dry_run":      true,
 			"method":       method,
@@ -139,7 +159,7 @@ func (r *Runner) ExecuteWrite(ctx context.Context, opts WriteOptions) error {
 		logger.Info("dry-run: %s %s", method, fullURL)
 		return p.Success(out)
 	}
-	return r.Execute(ctx, func(ctx context.Context, c *client.Client) (any, error) {
+	return r.execute(ctx, opts.BaseURL, func(ctx context.Context, c *client.Client) (any, error) {
 		var data any
 		var err error
 		if opts.FormEncoded {

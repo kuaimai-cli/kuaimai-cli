@@ -10,8 +10,8 @@ func TestLoadEmbeddedMetadata(t *testing.T) {
 	if meta.Version == "" {
 		t.Fatal("empty version")
 	}
-	if len(meta.ServiceNames()) < 1 {
-		t.Fatalf("expected at least 1 service, got %d", len(meta.ServiceNames()))
+	if len(meta.ServiceNames()) < 2 {
+		t.Fatalf("expected at least 2 services, got %d", len(meta.ServiceNames()))
 	}
 	svc, err := meta.FindService("item")
 	if err != nil {
@@ -30,8 +30,21 @@ func TestLoadEmbeddedMetadata(t *testing.T) {
 	if op.Pageable {
 		t.Fatal("item-detail should not be pageable")
 	}
-	if meta.OperationCount() < 5 {
-		t.Fatalf("expected at least 5 operations, got %d", meta.OperationCount())
+	scm, err := meta.FindService("scm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scm.BaseURL != "https://scm.superboss.cc/" {
+		t.Fatalf("scm baseUrl: got %q", scm.BaseURL)
+	}
+	if scm.ResolveBaseURL("https://erp1.superboss.cc/") != "https://scm.superboss.cc" {
+		t.Fatalf("scm ResolveBaseURL: got %q", scm.ResolveBaseURL("https://erp1.superboss.cc/"))
+	}
+	if item := meta.Services["item"]; item.ResolveBaseURL("https://erp1.superboss.cc/") != "https://erp1.superboss.cc" {
+		t.Fatalf("item ResolveBaseURL fallback: got %q", item.ResolveBaseURL("https://erp1.superboss.cc/"))
+	}
+	if meta.OperationCount() < 100 {
+		t.Fatalf("expected at least 100 operations, got %d", meta.OperationCount())
 	}
 }
 

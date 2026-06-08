@@ -28,10 +28,10 @@
 
 ## 能力快照（主线）
 
-- **meta**：`internal/registry/meta_data.json` **v1.6.0**，`item` 域 **1157** 个 operation
-- **shortcuts**：`item +list` / `count` / `get-detail` / `save` / `update-title`
+- **meta**：`internal/registry/meta_data.json` **v1.7.0**，`item` **1095** + `scm` **195** 个 operation
+- **shortcuts**：`item +list` / `count` / `get-detail` / `save` / `update-title`（scm 无 shortcuts，走 `service scm`）
 - **分页**：`--page-all` · `--page-limit` · `--page-confirm`（`internal/pagination`）
-- **Skill**：`kuaimai-shared` + `kuaimai-item` v2.0.0（8 个 `references/`）
+- **Skill**：`kuaimai-shared` + `kuaimai-item` v2.0.0（10 refs）+ `kuaimai-scm` v1.0.0（7 refs）
 
 ---
 

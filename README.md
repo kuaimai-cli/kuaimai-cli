@@ -1,8 +1,8 @@
 # kuaimai-cli
 
-快麦 ERP **商品（erp-items-core）** 命令行工具：查列表、看详情、改标题等。输出为结构化 JSON，适合脚本与 AI Agent 调用。架构与交互对标 [飞书 lark-cli](https://github.com/larksuite/lark-cli)。
+快麦 ERP **商品（erp-items-core）** 与 **供应链（erp-scm）** 命令行工具：查商品、改标题、查铺货日志、供应链商品等。输出为结构化 JSON，适合脚本与 AI Agent 调用。架构与交互对标 [飞书 lark-cli](https://github.com/larksuite/lark-cli)。
 
-**能力快照**：`meta_data.json` **v1.6.0**（**1157** 个 `/item` 接口契约）· **6** 个 shortcuts 子命令 · `service item <operation>` 原子兜底 · 分页防护 `--page-all` / `--page-limit` / `--page-confirm`。
+**能力快照**：`meta_data.json` **v1.7.0**（`item` **1095** + `scm` **195** 个接口契约）· **6** 个 item shortcuts · `service item|scm <operation>` 原子兜底 · 分页防护 `--page-all` / `--page-limit` / `--page-confirm`。
 
 | 资源 | 链接 |
 |------|------|
@@ -16,15 +16,16 @@
 - 按标题、货号等条件 **搜索商品列表**
 - 查看商品 **详情**（含 SKU）
 - **修改商品标题**（支持 `--dry-run` 预览）
+- 查询 **供应链员工、铺货/操作日志、供应链商品、平台铺货配置**（`service scm`）
 - 管理 **配置、鉴权、Skill**（供 Cursor 等 Agent 读取领域约定）
-- 通过 **`schema` / `service`** 调用 meta 已注册的任意商品接口（无需手写 URL）
+- 通过 **`schema` / `service`** 调用 meta 已注册的任意 item / scm 接口（无需手写 URL）
 
 ---
 
 ## 环境要求
 
 - **操作系统**：macOS / Linux / Windows（`amd64` 或 `arm64`；Windows 暂无 `arm64` 包）
-- **网络**：能访问快麦 ERP（默认 `https://erp1.superboss.cc/`）及 GitHub（安装时下载二进制）
+- **网络**：能访问快麦 ERP（商品默认 `https://erp1.superboss.cc/`；供应链 `https://scm.superboss.cc/`）及 GitHub（安装时下载二进制）
 - **安装方式任选其一**：
   - Node.js **16+**（推荐，支持 `npx` 一键安装）
   - 或直接从 Release 下载二进制（无需 Node）
@@ -104,13 +105,13 @@ kuaimai-cli auth list
 
 ### 3. 安装 Skill（使用 Cursor / Agent 时建议）
 
-让 Agent 了解商品域命令约定与工作流（对标飞书 lark-* Skill 结构）：
+让 Agent 了解商品与供应链域命令约定与工作流（对标飞书 lark-* Skill 结构）：
 
 ```bash
 kuaimai-cli skill install
 ```
 
-从 GitHub 安装 `kuaimai-shared` + `kuaimai-item` v2.0.0 **整目录**（含 **8** 个 `references/` 工作流文档），同时写入 `~/.agents/skills`、`~/.cursor/skills` 等 5 个 Agent 目录。仓库内开发时可直接读 `skills/kuaimai-item/SKILL.md`。
+从 GitHub 安装 `kuaimai-shared` + `kuaimai-item` v2.0.0 + `kuaimai-scm` v1.0.0 **整目录**（含 `references/` 工作流文档），同时写入 `~/.agents/skills`、`~/.cursor/skills` 等 5 个 Agent 目录。仓库内开发时可直接读 `skills/kuaimai-item/SKILL.md` 或 `skills/kuaimai-scm/SKILL.md`。
 
 ### 4. 自检
 
@@ -184,18 +185,46 @@ kuaimai-cli auth check --output json
 kuaimai-cli auth logout
 ```
 
+### 供应链（scm）
+
+scm 域暂无 shortcuts，统一走 `service scm`（自动请求 `https://scm.superboss.cc/`）：
+
+```bash
+# 员工列表
+kuaimai-cli service scm staff-query \
+  --body '{"pageNo":1,"pageSize":20}' \
+  --output json
+
+# 铺货日志（多数日志接口需 startTime/endTime）
+kuaimai-cli service scm logging-publish-log \
+  --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}' \
+  --output json
+
+# 供应链商品列表
+kuaimai-cli service scm item-base-page \
+  --body '{"pageNo":1,"pageSize":50}' \
+  --output json
+
+# 平台铺货配置
+kuaimai-cli service scm dsb-query-distribution-config \
+  --body '{"shopType":"TouTiaoFXG"}' \
+  --output json
+```
+
+详见 `skills/kuaimai-scm/SKILL.md`。**勿与 item 混用**：路径同为 `/item/*` 时，`service item`（erp1）与 `service scm`（scm）语义不同。
+
 ### Skill
 
 ```bash
 kuaimai-cli skill list --output json
-kuaimai-cli skill install              # kuaimai-shared + kuaimai-item（整目录）
-kuaimai-cli skill install kuaimai-item # 单个 Skill
+kuaimai-cli skill install              # kuaimai-shared + kuaimai-item + kuaimai-scm
+kuaimai-cli skill install kuaimai-scm  # 单个 Skill
 ```
 
 ### 元数据与原子 API
 
 ```bash
-# 自省全部接口（1157 个 operation）
+# 自省全部接口（1290 个 operation：item 1095 + scm 195）
 kuaimai-cli schema --output json
 
 # 原子调用（operation 名见 schema，如 stock-list，非子命令名 list）
@@ -287,10 +316,11 @@ npm install -g @kuaimai-cli/cli@latest
 
 - 安装与鉴权详见 [Agent 安装指南](docs/快麦 CLI 安装（Agent 专用）.md)
 - Agent 行为约定见仓库根目录 [AGENTS.md](AGENTS.md)
-- Skill 安装后位于 `~/.agents/skills/kuaimai-item/`（含 `SKILL.md` 与 `references/`）
+- Skill 安装后位于 `~/.agents/skills/kuaimai-{shared,item,scm}/`（含 `SKILL.md` 与 `references/`）
 - 商品域：先 Read `kuaimai-item/SKILL.md` → 写操作再 Read 对应 `references/` 文档
-- 无 shortcut 的接口（如 `item-query-list-v2`）：Read `references/kuaimai-item-service.md`
-- 全量翻页：非交互执行加 `--page-confirm yes`；见 `references/kuaimai-item-meta-execution.md`
+- 供应链域：先 Read `kuaimai-scm/SKILL.md` → `service scm <operation>`（无 shortcuts）
+- 无 shortcut 的 item 接口（如 `item-query-list-v2`）：Read `references/kuaimai-item-service.md`
+- 全量翻页：非交互执行加 `--page-confirm yes`；见各域 `references/*-meta-execution.md`
 - 命令选型见 [Agent 命令选型与 schema 流程](docs/Agent命令选型与schema流程.md)
 
 ---

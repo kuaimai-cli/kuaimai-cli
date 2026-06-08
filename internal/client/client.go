@@ -347,6 +347,17 @@ func statusHint(code int) string {
 	}
 }
 
+// WithBaseURL returns a shallow copy of the client using a different API base URL.
+func (c *Client) WithBaseURL(baseURL string) *Client {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" || c == nil {
+		return c
+	}
+	cp := *c
+	cp.baseURL = strings.TrimRight(baseURL, "/")
+	return &cp
+}
+
 // PostJSON marshals v and POSTs to path.
 func (c *Client) PostJSON(ctx context.Context, path string, v any) (any, int, error) {
 	b, err := json.Marshal(v)

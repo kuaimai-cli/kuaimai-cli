@@ -1,7 +1,7 @@
 # Agent 命令选型与 schema 流程
 
-> 说明 AI Agent 如何将用户自然语言路由到 **shortcuts**（`item …`）或 **service**（`service item …`），以及 **何时查询 `schema`**。  
-> 配套：[meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) · [系统架构与飞书对标说明](./系统架构与飞书对标说明.md) · [AGENTS.md](../AGENTS.md) · [kuaimai-item/SKILL.md](../skills/kuaimai-item/SKILL.md)
+> 说明 AI Agent 如何将用户自然语言路由到 **shortcuts**（`item …`）或 **service**（`service item|scm …`），以及 **何时查询 `schema`**。  
+> 配套：[meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) · [系统架构与飞书对标说明](./系统架构与飞书对标说明.md) · [AGENTS.md](../AGENTS.md) · [kuaimai-item/SKILL.md](../skills/kuaimai-item/SKILL.md) · [kuaimai-scm/SKILL.md](../skills/kuaimai-scm/SKILL.md)
 
 ---
 
@@ -9,8 +9,8 @@
 
 | 层级 | 命令示例 | 实现 | Agent 默认 |
 |------|----------|------|------------|
-| **1. shortcuts** | `item +list`、`item update-title` | `shortcuts/item/` | ✅ 优先 |
-| **2. service** | `service item stock-list` | `meta_data.json` + `cmd/servicecmd` | 兜底 |
+| **1. shortcuts** | `item +list`、`item update-title` | `shortcuts/item/` | ✅ item 域优先 |
+| **2. service** | `service item stock-list`、`service scm staff-query` | `meta_data.json` + `cmd/servicecmd` | item 兜底 / **scm 唯一入口** |
 | **3. api** | `api POST /item/stock/queryList` | `cmd/api` | 最后手段 |
 
 飞书对标：`calendar +agenda` → `item +list` · `calendar events list` → `service item stock-list` · 原生 path → `api POST …`
@@ -18,9 +18,11 @@
 **Agent 口诀**：
 
 ```text
-有 Shortcut → 不查 schema，读 Skill / references
+有 Shortcut（item 域）→ 不查 schema，读 Skill / references
+scm 域无 shortcuts → 读 kuaimai-scm Skill → service scm <operation>
 走 service / api → 先 schema 全量（或规划中的 schema item.<operation>），再执行
 不知道有哪些接口 → schema 全量
+item 与 scm 路径同为 /item/* 时 → 必读 kuaimai-scm-domain-routing.md 分流
 ```
 
 ---
@@ -33,11 +35,14 @@ flowchart TD
 
   RouteSkill -->|配置/登录/输出/安装| Shared[kuaimai-shared]
   RouteSkill -->|商品/标题/SKU/列表/详情/改名| ItemSkill[kuaimai-item/SKILL.md]
+  RouteSkill -->|供应链/铺货/操作日志/scm 商品| ScmSkill[kuaimai-scm/SKILL.md]
 
   Shared --> SharedCmd[config / auth / skill install / doctor …]
   ItemSkill --> ReadShared[CRITICAL: Read kuaimai-shared]
+  ScmSkill --> ReadShared
 
   ReadShared --> Intent[解析意图: 选哪个命令表]
+  ScmSkill --> ScmService[service scm operation]
   Intent --> HasShortcut{Skill 有明确 Shortcut?}
 
   HasShortcut -->|是| WriteOp{写操作?}
@@ -109,6 +114,24 @@ flowchart TD
 ```
 
 **商品域默认**：「选哪个命令」表能命中的，**一律走 shortcuts**；仅表外或刻意走原子 API 时用 service / api。
+
+---
+
+## 3.1 供应链域：Skill 意图 → service scm
+
+scm 域**无 shortcuts**，Agent 一律 Read `kuaimai-scm/SKILL.md` 后走 `service scm <operation>`。
+
+| 用户意图 | meta operation | CLI 命令 |
+|----------|----------------|----------|
+| 查员工 / 用户列表 | `staff-query` | `service scm staff-query` |
+| 铺货日志 | `logging-publish-log` | `service scm logging-publish-log` |
+| 操作日志 | `logging-operator-log` | `service scm logging-operator-log` |
+| 供应链商品列表 | `item-base-page` | `service scm item-base-page` |
+| 平台铺货配置 | `dsb-query-distribution-config` | `service scm dsb-query-distribution-config` |
+
+**分流 CRITICAL**：路径同为 `/item/*` 时，`service item`（erp1）与 `service scm`（scm.superboss.cc）语义不同，必读 [`kuaimai-scm-domain-routing.md`](../skills/kuaimai-scm/references/kuaimai-scm-domain-routing.md)。
+
+**scm 域默认**：Skill 表能命中的直接 `service scm`；不确定 operation 名时 `schema --output json`；写操作先 Read 对应 `references/` 并 `--dry-run`。
 
 ---
 
@@ -256,7 +279,7 @@ schema（全量）→ service item item-save --body '…'（须全量 body）
 kuaimai-cli schema --output json
 ```
 
-输出全部 operation（当前 **1157** 个）的**路由元信息**：service、operation（如 `stock-list`）、method、path、contentType、pageable、write、requestSchema/responseSchema、shortcut 映射等。
+输出全部 operation（当前 **1290** 个：`item` 1095 + `scm` 195）的**路由元信息**：service、operation（如 `stock-list`）、method、path、contentType、pageable、write、requestSchema/responseSchema、shortcut 映射、baseUrl 等。
 
 `jq` 示例：
 
@@ -280,10 +303,10 @@ kuaimai-cli schema item.item-save --output json   # 含 requestSchema 字段说�
 
 ## 8. 维护者：新增接口时的同步清单
 
-1. 按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 在 `internal/registry/meta_data.json` 登记 operation（`模块-操作` 命名，填 path/method/contentType/write/pageable/Schema）  
-2. `shortcuts/item/` 若 Agent 高频则加封装  
-3. `skills/kuaimai-item/SKILL.md` + `references/`  
-4. 验收：`schema` 能列出、`service item <operation>` 可调，path 与 shortcuts 一致
+1. 按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 在 `internal/registry/meta_data.json` 登记 operation（`模块-操作` 命名，填 path/method/contentType/write/pageable/Schema）；scm 域须含 `baseUrl`  
+2. **item 域**：`shortcuts/item/` 若 Agent 高频则加封装；更新 `skills/kuaimai-item/SKILL.md` + `references/`  
+3. **scm 域**：更新 `skills/kuaimai-scm/SKILL.md` + `references/`（scm 暂无 shortcuts）  
+4. 验收：`schema` 能列出、`service item|scm <operation>` 可调，path 与 shortcuts（如有）一致
 
 ---
 
@@ -293,6 +316,7 @@ kuaimai-cli schema item.item-save --output json   # 含 requestSchema 字段说�
 |------|------|
 | [系统架构与飞书对标说明.md](./系统架构与飞书对标说明.md) | §3 三级命令、§5 dry-run、§6 Skill |
 | [kuaimai-item/SKILL.md](../skills/kuaimai-item/SKILL.md) | Agent 商品域路由与 references |
+| [kuaimai-scm/SKILL.md](../skills/kuaimai-scm/SKILL.md) | Agent 供应链域路由与 references |
 | [AGENTS.md](../AGENTS.md) | 仓库根 Agent 约定 |
 | [meta_data.json 定义规范.md](./kuaimai-cli%20meta_data.json%20定义规范.md) | operation 命名、contentType、write/pageable、Schema |
 | [kuaimai-cli 开发文档.md](./kuaimai-cli%20开发文档.md) | §4.5 元数据注册表、新增 shortcuts 步骤 |

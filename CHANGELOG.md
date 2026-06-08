@@ -4,8 +4,19 @@
 
 ## Unreleased
 
+### Added
+
+- **meta_data.json v1.7.0**：新增 `scm` 域 **195** 个 operation（erp-scm staff/logging/item/dsb）；`item` 域 **1095** 个 operation；scm 使用 meta `baseUrl`（`https://scm.superboss.cc/`）
+- **Skill kuaimai-scm v1.0.0**：供应链域路由 + **7** 个 `references/`（domain-routing、meta-execution、service、staff、logging、item-base、dsb）
+- **`service scm <operation>`**：meta 驱动，自动请求 scm 域名；与 item 共用分页/dry-run/Schema 管线
+- **scm meta 生成脚本**：`scripts/generate_meta/generate_scm_meta.py`、`scripts/normalize_meta/normalize_scm_meta.py`
+- **`doctor`**：新增 `skill_kuaimai_scm` 检查（含 `references/`）
+- **`skill install`**：默认安装 `kuaimai-shared` + `kuaimai-item` + `kuaimai-scm`
+
 ### Changed
 
+- **文档全量对齐 v1.7.0**：README、`docs/` 索引、架构说明、Agent 选型、安装指南、验收测试、每阶段能力
+- **`AGENTS.md`**：补充 scm 域路由与 `service scm` 示例
 - **Skill 自动同步**：任意命令结束后后台执行 `install --if-stale` 逻辑（未安装 / Release 更新 / CLI 版本变化，24h Release 查询缓存）；`skill install` 无参数时默认等同 `--if-stale`，强制重装用 `--force`
 
 ### Fixed

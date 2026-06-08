@@ -182,15 +182,19 @@ def ensure_pageable_schema(op: dict) -> bool:
     return changed
 
 
-def normalize_operation(old_name: str, op: dict) -> tuple[str, dict, list[str]]:
+def normalize_operation(svc_name: str, old_name: str, op: dict) -> tuple[str, dict, list[str]]:
     notes: list[str] = []
-    new_name = path_to_op_id(op["path"], op["method"], old_name)
-    new_name = disambiguate(new_name, op["method"], op["path"], old_name)
-
-    # POST /item/saveItem：保留 item-save / item-update-title 两个核心 op
-    if op["path"] == "/item/saveItem" and op["method"].upper() == "POST":
-        if old_name in ("item-save", "item-update-title"):
-            new_name = old_name
+    if svc_name == "item":
+        new_name = path_to_op_id(op["path"], op["method"], old_name)
+        new_name = disambiguate(new_name, op["method"], op["path"], old_name)
+        if op["path"] == "/item/saveItem" and op["method"].upper() == "POST":
+            if old_name in ("item-save", "item-update-title"):
+                new_name = old_name
+    elif svc_name == "scm":
+        segments = [camel_to_kebab(seg) for seg in op["path"].strip("/").split("/") if seg]
+        new_name = "-".join(segments) if segments else old_name
+    else:
+        new_name = old_name
 
     if new_name != old_name:
         notes.append(f"rename {old_name} -> {new_name}")
@@ -208,7 +212,7 @@ def normalize_meta(meta: dict) -> tuple[dict, list[str]]:
     for svc_name, svc in meta.get("services", {}).items():
         new_ops: dict = {}
         for old_name, op in svc.get("operations", {}).items():
-            new_name, op, notes = normalize_operation(old_name, op)
+            new_name, op, notes = normalize_operation(svc_name, old_name, op)
             all_notes.extend(notes)
             if new_name in new_ops:
                 existing = new_ops[new_name]
@@ -231,10 +235,10 @@ def normalize_meta(meta: dict) -> tuple[dict, list[str]]:
 
     meta = dict(meta)
     meta["services"] = new_services
-    meta["version"] = meta.get("version", "1.4.0")
-    if not meta["version"].endswith(".1"):
-        meta["version"] = "1.4.1"
-    meta["generated_at"] = "2026-06-01"
+    if not meta.get("version"):
+        meta["version"] = "1.7.0"
+    if not meta.get("generated_at"):
+        meta["generated_at"] = "2026-06-08"
     return meta, all_notes
 
 
@@ -261,6 +265,10 @@ def validate(meta: dict) -> list[str]:
     for core in CORE_OPS:
         if core not in item_ops:
             errors.append(f"missing core operation: {core}")
+    scm_svc = meta.get("services", {}).get("scm")
+    if scm_svc is not None:
+        if not str(scm_svc.get("baseUrl", "")).strip():
+            errors.append("missing baseUrl: scm service")
     return errors
 
 

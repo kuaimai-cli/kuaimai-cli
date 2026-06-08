@@ -34,13 +34,16 @@ func doctorCmd() *cobra.Command {
 			path, _ := exec.LookPath("kuaimai-cli")
 			skillOK, _ := skill.IsInstalled("kuaimai-item")
 			refOK, _ := skill.HasReferences("kuaimai-item")
-			skillReady := skillOK && refOK
+			scmSkillOK, _ := skill.IsInstalled("kuaimai-scm")
+			scmRefOK, _ := skill.HasReferences("kuaimai-scm")
+			skillReady := skillOK && refOK && scmSkillOK && scmRefOK
 
 			checks := []map[string]any{
 				{"name": "config", "ok": configOK, "hint": hintConfig(configOK)},
 				{"name": "auth", "ok": loggedIn, "hint": hintAuth(loggedIn)},
 				{"name": "path", "ok": path != "", "hint": hintPath(path)},
-				{"name": "skill_kuaimai_item", "ok": skillReady, "hint": hintSkill(skillOK, refOK)},
+				{"name": "skill_kuaimai_item", "ok": skillOK && refOK, "hint": hintSkill(skillOK, refOK)},
+				{"name": "skill_kuaimai_scm", "ok": scmSkillOK && scmRefOK, "hint": hintScmSkill(scmSkillOK, scmRefOK)},
 			}
 			allOK := configOK && loggedIn && path != "" && skillReady
 
@@ -85,6 +88,16 @@ func hintSkill(installed, hasRefs bool) string {
 	return "执行 kuaimai-cli skill install"
 }
 
+func hintScmSkill(installed, hasRefs bool) string {
+	if installed && hasRefs {
+		return "kuaimai-scm Skill 已安装（含 references/）"
+	}
+	if installed && !hasRefs {
+		return "kuaimai-scm 缺少 references/，请执行 kuaimai-cli skill install kuaimai-scm"
+	}
+	return "执行 kuaimai-cli skill install kuaimai-scm"
+}
+
 func nextSteps(configOK, loggedIn, skillOK bool) []string {
 	var steps []string
 	if !configOK {
@@ -100,7 +113,7 @@ func nextSteps(configOK, loggedIn, skillOK bool) []string {
 		steps = append(steps, "kuaimai-cli skill install")
 	}
 	if len(steps) == 0 {
-		steps = append(steps, "环境就绪，可使用 item +list / item update-title 等命令")
+		steps = append(steps, "环境就绪，可使用 item +list / service scm 等命令")
 	}
 	return steps
 }

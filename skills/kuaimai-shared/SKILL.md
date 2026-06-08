@@ -10,7 +10,7 @@ metadata:
 
 # kuaimai-cli 共享规则
 
-本技能指导你如何通过 kuaimai-cli 操作快麦 ERP 资源，以及有哪些注意事项。商品查询、改标题等 **item 域** 操作见 [`kuaimai-item`](../kuaimai-item/SKILL.md)。
+本技能指导你如何通过 kuaimai-cli 操作快麦 ERP 资源，以及有哪些注意事项。商品查询、改标题等 **item 域** 见 [`kuaimai-item`](../kuaimai-item/SKILL.md)；供应链、铺货日志等 **scm 域** 见 [`kuaimai-scm`](../kuaimai-scm/SKILL.md)。
 
 ## CLI 可执行文件
 
@@ -35,7 +35,8 @@ kuaimai-cli config set api.url "<url>"
 | 项 | 说明 |
 |----|------|
 | 配置文件 | `~/.kuaimai-cli/config.yaml` |
-| 默认 API | `api.url` = `https://erp1.superboss.cc/` |
+| 默认 API | `api.url` = `https://erp1.superboss.cc/`（**item 域**） |
+| scm 域 | `service scm *` 自动使用 `https://scm.superboss.cc/`（meta `baseUrl`），无需改 `api.url` |
 
 完整安装步骤见仓库 [快麦 CLI 安装（Agent 专用）](https://github.com/kuaimai-cli/kuaimai-cli/blob/main/docs/快麦%20CLI%20安装（Agent%20专用）.md)。
 
@@ -101,6 +102,7 @@ npx @kuaimai-cli/cli@latest install
 # 安装 Skills（整目录：SKILL.md + references/）
 kuaimai-cli skill install
 kuaimai-cli skill install kuaimai-item
+kuaimai-cli skill install kuaimai-scm
 kuaimai-cli skill list --output json
 
 # 自检与版本
@@ -108,7 +110,7 @@ kuaimai-cli doctor --output json
 kuaimai-cli upgrade                # 默认：有新版则 npm 升级 + Skills 同步
 kuaimai-cli upgrade --check-only --output json
 kuaimai-cli skill install --if-stale
-kuaimai-cli schema --output json   # 全量 meta（1157 operations）
+kuaimai-cli schema --output json   # 全量 meta（item + scm）
 ```
 
 已安装路径：`~/.agents/skills/<name>/`（同时写入 `~/.cursor/skills` 等 Agent 目录）。`skill install` **覆盖写入**对应目录，无需手删缓存。任意命令后若有新版会在 **stderr** 提示（24h 缓存）。安装或升级 Skill 后 **重新打开 Agent 会话** 以加载最新内容。
@@ -147,4 +149,5 @@ kuaimai-cli schema --output json   # 全量 meta（1157 operations）
 |----------|-------|
 | 登录、配置、输出格式、安装 CLI/Skill | **本 Skill** |
 | 商品列表、按标题统计、详情、改标题 | [`kuaimai-item`](../kuaimai-item/SKILL.md) |
+| 供应链、铺货日志、scm 商品、平台配置 | [`kuaimai-scm`](../kuaimai-scm/SKILL.md) |
 | 维护者文档 | 仓库 [`docs/README.md`](../../docs/README.md) |

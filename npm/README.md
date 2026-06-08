@@ -1,6 +1,6 @@
 # @kuaimai-cli/cli
 
-快麦 ERP **商品（erp-items-core）** 命令行工具 npm 分发包，对标飞书 [`@larksuite/cli`](https://www.npmjs.com/package/@larksuite/cli)。
+快麦 ERP **商品（erp-items-core）** 与 **供应链（erp-scm）** 命令行工具 npm 分发包，对标飞书 [`@larksuite/cli`](https://www.npmjs.com/package/@larksuite/cli)。
 
 本包为 **薄壳**：`postinstall` / `run.js` 从 [GitHub Releases](https://github.com/kuaimai-cli/kuaimai-cli/releases) 下载对应平台的 Go 二进制；失败时自动回退 [npmmirror](https://registry.npmmirror.com) `/-/binary/kuaimai-cli/`（对标 `@larksuite/cli`，须在 [cnpmcore 注册](../docs/npmmirror-二进制镜像.md) 后镜像才可用）。
 
@@ -8,10 +8,10 @@
 
 | 项 | 说明 |
 |----|------|
-| 业务域 | 商品 list / count / 详情 / 改标题（`item` shortcuts） |
-| 元数据 | `meta_data.json` **v1.6.0**，**1157** 个 `/item` 接口（`schema` / `service item`） |
+| 业务域 | 商品 list / count / 详情 / 改标题（`item` shortcuts）；供应链 staff / 日志 / 商品 / 铺货配置（`service scm`） |
+| 元数据 | `meta_data.json` **v1.7.0**，`item` **1095** + `scm` **195** 个接口（`schema` / `service item|scm`） |
 | 分页 | `--page-all` · `--page-limit` · `--page-confirm`（海量数据防护） |
-| Agent | `skill install` / `--if-stale`；`upgrade` 默认一键升级 + stderr 新版本提示 |
+| Agent | `skill install`（shared + item + scm）/ `--if-stale`；`upgrade` 默认一键升级 + stderr 新版本提示 |
 
 ## 用户安装（推荐）
 
@@ -93,7 +93,7 @@ kuaimai-cli --version
 
 - Node.js **16+**
 - 网络可访问 `github.com`（下载 Release 二进制）
-- 业务请求默认 `https://erp1.superboss.cc/`
+- 业务请求：商品默认 `https://erp1.superboss.cc/`；供应链 `https://scm.superboss.cc/`（`service scm` 自动使用）
 
 ## 文档
 

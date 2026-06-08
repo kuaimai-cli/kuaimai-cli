@@ -1,6 +1,6 @@
 # kuaimai-cli 文档索引
 
-快麦 **erp-items-core** 商品 CLI，架构对标飞书 [lark-cli](https://github.com/larksuite/lark-cli)。
+快麦 **erp-items-core** 商品 + **erp-scm** 供应链 CLI，架构对标飞书 [lark-cli](https://github.com/larksuite/lark-cli)。
 
 ## 按读者
 
@@ -27,21 +27,33 @@
 | [.github/RELEASE_TEMPLATE.md](../.github/RELEASE_TEMPLATE.md) | GitHub Release 手动编辑模板 |
 | [kuaimai-cli 验收测试.md](./kuaimai-cli%20验收测试.md) | 分阶段验收命令与检查项 |
 
-## 当前能力快照（与代码一致，2026-06-02）
+## 当前能力快照（与代码一致，2026-06-08）
 
 ### 三层架构（已定稿）
 
 | 层级 | 模块 | 状态 |
 |------|------|------|
-| 底层 | `meta_data.json` | ✅ **v1.6.0**，`item` 域 **1157** 个 operation（erp-items-core `/item` Controller 全量注册） |
-| 中层 | Skill（`kuaimai-item` v2.0.0 + references） | ✅ 执行规则、meta 驱动说明、分页防护、service 兜底指南 |
-| 上层 | shortcuts（6 子命令）+ `service item` + `api` | ✅ 双轨命令；高频走 shortcuts，其余走 service |
+| 底层 | `meta_data.json` | ✅ **v1.7.0**，`item` **1095** + `scm` **195** 个 operation |
+| 中层 | Skill（`kuaimai-item` v2.0.0 + `kuaimai-scm` v1.0.0 + references） | ✅ 执行规则、meta 驱动说明、分页防护、service 兜底指南 |
+| 上层 | item shortcuts（6 子命令）+ `service item|scm` + `api` | ✅ item 双轨；scm 仅 service（无 shortcuts） |
 
 ### 业务与命令
 
+**商品域（item）**
+
 - **shortcuts**：`item +list` / `list` / `count` / `get-detail` / `save` / `update-title`
-- **meta 核心 6 个**（有 shortcut 映射）：`stock-list`、`stock-count`、`item-detail`、`item-save`、`item-update-title`；另有 **`item-query-count`**、**`item-query-list-v2`**（仅 service，Skill 已文档化；统计/列表区分见 `skills/kuaimai-item/references/kuaimai-item-count-dimensions.md`）
-- **双轨**：Agent **优先 shortcuts**；原子兜底 `service item <operation>`（operation 名为 `stock-list` 等，**非** `list`）
+- **meta 核心 6 个**（5 有 shortcut + 1 仅 service）：`stock-list`、`stock-count`、`item-query-count`、`item-query-list-v2`、`item-detail`、`item-save`、`item-update-title`
+- **双轨**：Agent **优先 shortcuts**；原子兜底 `service item <operation>`
+- **域名**：config `api.url`（默认 erp1.superboss.cc）
+
+**供应链域（scm）**
+
+- **无 shortcuts**，统一 `service scm <operation>`（自动请求 `https://scm.superboss.cc/`）
+- **Skill 已文档化 10 个核心 operation**：staff、logging、item-base、dsb 等（全量 195 个见 `schema`）
+- **路由**：供应链 / 铺货 / 操作日志 → Read `kuaimai-scm/SKILL.md`
+
+**公共**
+
 - **contentType**：`get_query` · `post_form` · `post_json`
 - **分页**：`--page-all` + **`--page-limit`** + **`--page-confirm`**（500/1000 阈值交互续查，见 `internal/pagination`）
 
@@ -49,12 +61,11 @@
 
 - **鉴权**：`auth login|logout|status|check|list|use`，多 profile
 - **输出**：`--output table|json|csv|ndjson`；`--dry-run` · `--verbose` · `--no-color`
-- **元数据**：`schema` 全量自省 · `service item <op>` 零代码驱动（required 校验 + Schema 默认值）
-- **Agent**：`doctor` · `upgrade`（默认一键升级 + stderr 新版本提示）· `skill install` / `--if-stale`（GitHub 整目录覆盖写入）· E2E（`tests/cli_e2e`）
-- **默认 API**：`https://erp1.superboss.cc/`
+- **元数据**：`schema` 全量自省 · `service item|scm <op>` 零代码驱动（required 校验 + Schema 默认值）
+- **Agent**：`doctor`（含 kuaimai-scm Skill 检测）· `upgrade` · `skill install` / `--if-stale`（默认 3 个 Skill）· E2E（`tests/cli_e2e`）
 
 ### 框架状态
 
-**meta + Skill + CLI 基础能力已闭环**。后续新增接口只需：登记 meta →（可选）补 shortcut/Skill → 验收，**无需改造底层框架**。
+**meta + Skill + CLI 基础能力已闭环**。后续新增接口只需：登记 meta →（item 可选）补 shortcut/Skill → 验收，**无需改造底层框架**。
 
 变更记录见仓库根 [CHANGELOG.md](../CHANGELOG.md)。

@@ -23,7 +23,7 @@ const (
 func DefaultGitHubRepo() string { return defaultGitHubRepo }
 
 // DefaultSkillNames are bundled skills in the GitHub repo skills/ directory.
-var DefaultSkillNames = []string{"kuaimai-shared", "kuaimai-item"}
+var DefaultSkillNames = []string{"kuaimai-shared", "kuaimai-item", "kuaimai-scm"}
 
 // Entry describes an installed SKILL.md.
 type Entry struct {

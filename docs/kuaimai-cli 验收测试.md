@@ -1,7 +1,7 @@
 # kuaimai-cli 阶段开发准入、最低可用标准、阶段验收测试规范
 
 > 对标飞书 CLI；与 [开发文档](./kuaimai-cli%20开发文档.md)、[meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)、[每阶段新增能力](./每阶段新增能力.md)、[系统架构说明](./系统架构与飞书对标说明.md) 保持一致。  
-> **当前业务验收基准**：**erp-items-core 商品域**，以 **商品标题查改** 为核心场景（`item +list` → `save`）。
+> **当前业务验收基准**：**erp-items-core 商品域**（标题查改）+ **erp-scm 供应链域**（`service scm` 只读查询）。
 
 ---
 
@@ -101,13 +101,14 @@ kuaimai-cli api POST /item/stock/queryCount --body '{}' --output json --verbose
 
 - [ ] `shortcuts/common/runner` 可用
 - [ ] `meta_data.json` 嵌入，`schema` / `service` 可用
-- [ ] `item` 已在 meta 中注册（当前 **v1.6.0**，**1157** operations；核心 6 个含 `item-query-list-v2`）
+- [ ] `item` / `scm` 已在 meta 中注册（当前 **v1.7.0**，item **1095** + scm **195** operations）
 
 ### 4.2 元数据与服务命令
 
 ```bash
 kuaimai-cli schema --output json | jq '.data.version'                    # 期望 1.6.0
-kuaimai-cli schema --output json | jq '.data.operations | length'       # 期望 1157
+kuaimai-cli schema --output json | jq '.data.version'                  # 期望 1.7.0
+kuaimai-cli schema --output json | jq '.data.operations | length'       # 期望 1290
 kuaimai-cli schema --output json | jq '[.data.operations[] | select(.shortcut != "")] | length'  # 期望 5
 kuaimai-cli service item stock-list --help
 kuaimai-cli service item item-query-list-v2 --help
@@ -222,14 +223,31 @@ kuaimai-cli item +list --body '{"title":"CLI验收","pageNo":1,"pageSize":10}' -
 ```bash
 kuaimai-cli skill list --output json
 kuaimai-cli skill install kuaimai-item
+kuaimai-cli skill install kuaimai-scm
 ```
 
-- [ ] 能列出 `kuaimai-item`、`kuaimai-shared`
+- [ ] 能列出 `kuaimai-item`、`kuaimai-shared`、`kuaimai-scm`
 - [ ] `skill install` 写入 `~/.agents/skills/<name>/` 整目录（`SKILL.md` + `references/`）
-- [ ] `kuaimai-item/references/` 含 **8** 个工作流文档（list、count、get-detail、update-title、save、meta-execution、service、query-list-v2）
+- [ ] `kuaimai-item/references/` 含 **10** 个工作流文档
+- [ ] `kuaimai-scm/references/` 含 **7** 个工作流文档（domain-routing、meta-execution、service、staff、logging、item-base、dsb）
 - [ ] `kuaimai-item/SKILL.md` 含 CRITICAL 读 shared、Shortcuts 表、API Resources、快速决策
-- [ ] `kuaimai-shared/SKILL.md` 含 `metadata.cliHelp`，无 item 域长命令模板
-- [ ] `doctor` 检测 `references/` 缺失时提示重装
+- [ ] `kuaimai-scm/SKILL.md` 含 scm 路由表、`service scm` 说明、item/scm 分流
+- [ ] `kuaimai-shared/SKILL.md` 含 `metadata.cliHelp`，路由至 item/scm 域 Skill
+- [ ] `doctor` 检测 item 与 scm 的 `references/` 缺失时提示重装
+
+### 5.5.1 供应链域（scm）
+
+```bash
+kuaimai-cli service scm staff-query --body '{"pageNo":1,"pageSize":5}' --output json
+kuaimai-cli service scm logging-publish-log \
+  --body '{"pageNo":1,"pageSize":5,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}' \
+  --output json
+kuaimai-cli service scm item-base-page --body '{"pageNo":1,"pageSize":5}' --output json
+```
+
+- [ ] 请求发往 `scm.superboss.cc`（非 erp1）
+- [ ] 返回 JSON 信封 `ok: true`（或业务可识别结构）
+- [ ] 日志类接口缺 `startTime`/`endTime` 时业务报错符合预期
 
 ### 5.6 多格式输出（需 list 有数据）
 
@@ -321,7 +339,7 @@ kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run -
 
 1. 阶段一全部通过后再扩展阶段二  
 2. 阶段三以 **item 标题查改** 为业务验收基准  
-3. 新接口：按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 更新 `shortcuts/item` + `meta_data.json` + Skill + 本文档  
+3. 新接口：按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 更新 `meta_data.json` + 对应 Skill；item 高频接口另更新 `shortcuts/item` + 本文档  
 
 ---
 

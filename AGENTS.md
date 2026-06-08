@@ -6,9 +6,9 @@
 
 | 层级 | 模块 | Agent 动作 |
 |------|------|------------|
-| meta | `meta_data.json` v1.6.0（1157 op） | 需要发现接口时 `schema --output json` |
-| Skill | `kuaimai-item` v2.0.0 + `references/` | **优先** Read SKILL.md；写操作 Read references |
-| CLI | shortcuts → service → api | 有 shortcut 不查 schema |
+| meta | `meta_data.json` v1.7.0（item + scm） | 需要发现接口时 `schema --output json` |
+| Skill | `kuaimai-item` / `kuaimai-scm` + `references/` | **优先** Read SKILL.md；写操作 Read references |
+| CLI | shortcuts → service → api | item 有 shortcut 不查 schema；scm 走 `service scm` |
 
 ## 输出
 
@@ -26,40 +26,57 @@
 kuaimai-cli item +list --body '{"title":"关键字","pageNo":1,"pageSize":50}' --output json
 kuaimai-cli item count --body '{"title":"关键字"}' --output json
 kuaimai-cli item get-detail --sys-item-id <id>
-kuaimai-cli item save --body '{...}' --dry-run
 kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run
+```
+
+- 域名：`api.url` 默认 `https://erp1.superboss.cc/`
+- 详见 `skills/kuaimai-item/SKILL.md`
+
+## 供应链域（scm）
+
+**无 shortcuts**，统一走 `service scm`（自动请求 `https://scm.superboss.cc/`）：
+
+```bash
+kuaimai-cli service scm staff-query --body '{"pageNo":1,"pageSize":20}' --output json
+kuaimai-cli service scm logging-publish-log \
+  --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}' --output json
+kuaimai-cli service scm item-base-page --body '{"pageNo":1,"pageSize":50}' --output json
+kuaimai-cli service scm dsb-query-distribution-config --body '{"shopType":"TouTiaoFXG"}' --output json
+```
+
+- **勿与 item 混用**：路径同为 `/item/*` 时，`service item`（erp1）与 `service scm`（scm）语义不同
+- 铺货/操作日志多数需 `startTime`/`endTime`
+- 详见 `skills/kuaimai-scm/SKILL.md` 与 `references/kuaimai-scm-domain-routing.md`
+
+## 公共
+
+```bash
 kuaimai-cli doctor
 kuaimai-cli upgrade                    # 默认一键升级；仅检查加 --check-only
 ```
 
-- **升级**：任意命令后 stderr 可能提示新版（24h 缓存）；`upgrade` 默认执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills
-- list/count：`application/x-www-form-urlencoded`（`--body` JSON 会转为 form）
-- **统计口径**：库存页标题统计 → `item count`；商品档案（品牌/类目等）→ `service item item-query-count`（勿混用 `item count`）；详见 `skills/kuaimai-item/references/kuaimai-item-count-dimensions.md`
-- 鉴权：`accessToken` 须由用户提供（联系 ERP 管理员申请），Agent 不可代填；`auth login` 后请求头自动带 token；可用 `auth check` 探测
-- 多账号：`auth login --profile <name>` · `auth use <name>` · `auth list`
-- **列表翻页**（`pageable:true`，如 `stock-list`、`item-query-list-v2`）：
-  - 默认单页，用户未要求「全部」时**不要**加 `--page-all`
-  - 全量：`--page-all`；Agent/管道续查：`--page-confirm yes`；限条数：`--page-limit N`
-  - 规则详见 `skills/kuaimai-item/references/kuaimai-item-meta-execution.md`
-- 改标题：优先 `item update-title`；或 `get-detail` + jq + `item save`（见 `skills/kuaimai-item/references/`）
-- **无 shortcut**（档案 V2）：列表 `service item item-query-list-v2`；统计 `service item item-query-count`（`pageNo`/`pageSize` 必填）
-- 原子 API 兜底：`service item <operation>`（operation 名如 `stock-list`，**非** `list`；见 [meta 定义规范](./docs/kuaimai-cli%20meta_data.json%20定义规范.md)）
+- **鉴权**：`accessToken` 须由用户提供；`auth login` 后请求头自动带 token
+- **多账号**：`auth login --profile <name>` · `auth use <name>` · `auth list`
+- **列表翻页**（`pageable:true`）：默认单页；全量 `--page-all`；Agent 续查 `--page-confirm yes`
 
 ## Skill
 
 ```bash
-kuaimai-cli skill list
-kuaimai-cli skill install                  # kuaimai-shared + kuaimai-item（整目录含 references/）
-kuaimai-cli skill install --if-stale       # 仅在 Release/CLI 变化或未安装时更新
-kuaimai-cli skill install kuaimai-item     # 安装单个 Skill
+kuaimai-cli skill install                  # kuaimai-shared + kuaimai-item + kuaimai-scm
+kuaimai-cli skill install --if-stale
+kuaimai-cli skill install kuaimai-scm
 ```
 
-安装后 Agent 优先读取 `~/.agents/skills/kuaimai-item/SKILL.md`；仓库内开发时读 `skills/kuaimai-item/SKILL.md`。
+**Agent 路由口诀**：
+
+- 供应链 / scm / 铺货 / 操作日志 → Read `kuaimai-scm/SKILL.md` → `service scm <operation>`
+- ERP 库存商品 / 改标题 → Read `kuaimai-item/SKILL.md` → item shortcuts 优先
+- 配置 / 登录 / 输出 → Read `kuaimai-shared/SKILL.md`
 
 **CRITICAL**：
 
 1. 开始前 Read `kuaimai-shared/SKILL.md`
-2. 写操作（`save`、`update-title`）须先 Read 对应 `references/` 文档
+2. 写操作须先 Read 对应 `references/` 文档
 3. 命令选型见 [Agent命令选型与schema流程.md](./docs/Agent命令选型与schema流程.md)
 
 ## 安全

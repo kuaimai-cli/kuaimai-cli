@@ -44,12 +44,12 @@ func serviceGroup(svcName string, svc registry.Service) *cobra.Command {
 	}
 	for _, opName := range svc.OperationNames() {
 		op := svc.Operations[opName]
-		cmd.AddCommand(operationCmd(op))
+		cmd.AddCommand(operationCmd(svcName, svc, op))
 	}
 	return cmd
 }
 
-func operationCmd(op registry.Operation) *cobra.Command {
+func operationCmd(svcName string, svc registry.Service, op registry.Operation) *cobra.Command {
 	short := fmt.Sprintf("%s %s — %s", op.Method, op.Path, op.Summary)
 	var bodyJSON string
 	defaultBody := op.DefaultBodyJSON()
@@ -57,7 +57,7 @@ func operationCmd(op registry.Operation) *cobra.Command {
 		Use:   op.Name,
 		Short: short,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runOperation(op, bodyJSON)
+			return runOperation(svcName, svc, op, bodyJSON)
 		},
 	}
 	if op.NeedsBody() {
@@ -66,7 +66,7 @@ func operationCmd(op registry.Operation) *cobra.Command {
 	return c
 }
 
-func runOperation(op registry.Operation, bodyJSON string) error {
+func runOperation(_ string, svc registry.Service, op registry.Operation, bodyJSON string) error {
 	if core.Ctx.DryRun && !op.Write {
 		return fmt.Errorf("操作 %s 为查询接口，不支持 --dry-run（请使用 write:true 的写接口）", op.Name)
 	}
@@ -76,12 +76,13 @@ func runOperation(op registry.Operation, bodyJSON string) error {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return err
 	}
+	baseURL := svc.ResolveBaseURL(f.Config.APIURL())
 	r := common.NewRunner(f)
 	method := strings.ToUpper(op.Method)
 
 	switch op.ContentType {
 	case registry.ContentTypeGetQuery:
-		return runGetQuery(r, op, method, bodyJSON)
+		return runGetQuery(r, baseURL, op, method, bodyJSON)
 	case registry.ContentTypePostForm, registry.ContentTypePostJSON:
 		body, err := common.ParseBodyJSON(bodyJSON)
 		if err != nil {
@@ -99,6 +100,7 @@ func runOperation(op registry.Operation, bodyJSON string) error {
 			Path:        op.Path,
 			Body:        body,
 			FormEncoded: op.FormEncoded(),
+			BaseURL:     baseURL,
 			PageAll:     &pageAll,
 		})
 	default:
@@ -106,7 +108,7 @@ func runOperation(op registry.Operation, bodyJSON string) error {
 	}
 }
 
-func runGetQuery(r *common.Runner, op registry.Operation, method, bodyJSON string) error {
+func runGetQuery(r *common.Runner, baseURL string, op registry.Operation, method, bodyJSON string) error {
 	path := op.Path
 	if strings.TrimSpace(bodyJSON) != "" && bodyJSON != "{}" {
 		body, err := common.ParseBodyJSON(bodyJSON)
@@ -126,7 +128,7 @@ func runGetQuery(r *common.Runner, op registry.Operation, method, bodyJSON strin
 	} else if op.RequestSchema != nil && len(op.RequestSchema.Required) > 0 {
 		return fmt.Errorf("操作 %s 需要 --body 提供查询参数（见 kuaimai-cli schema）", op.Name)
 	}
-	return r.Execute(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+	return r.ExecuteWithBase(context.Background(), baseURL, func(ctx context.Context, c *client.Client) (any, error) {
 		data, _, err := c.Request(ctx, method, path, nil)
 		if err != nil {
 			return nil, err

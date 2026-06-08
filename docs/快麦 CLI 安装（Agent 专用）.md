@@ -23,7 +23,7 @@ kuaimai-cli skill install
 
 （无参数时仅在需要时更新；强制覆盖请加 `--force`）
 
-默认安装 `kuaimai-shared`（全局约定）与 `kuaimai-item` v2.0.0（商品域）。安装后目录结构示例：
+默认安装 `kuaimai-shared`（全局约定）、`kuaimai-item` v2.0.0（商品域）与 `kuaimai-scm` v1.0.0（供应链域）。安装后目录结构示例：
 
 ```text
 ~/.agents/skills/kuaimai-item/
@@ -34,17 +34,29 @@ kuaimai-cli skill install
     ├── kuaimai-item-get-detail.md
     ├── kuaimai-item-update-title.md
     ├── kuaimai-item-save.md
-    ├── kuaimai-item-meta-execution.md    # meta 驱动规则、分页防护
-    ├── kuaimai-item-service.md           # service 层兜底
-    ├── kuaimai-item-count-dimensions.md  # 库存/档案 统计与列表 三接口区分
-    ├── kuaimai-item-query-count.md       # 档案总数 item-query-count
-    └── kuaimai-item-query-list-v2.md     # 档案 V2 列表
+    ├── kuaimai-item-meta-execution.md
+    ├── kuaimai-item-service.md
+    ├── kuaimai-item-count-dimensions.md
+    ├── kuaimai-item-query-count.md
+    └── kuaimai-item-query-list-v2.md
+
+~/.agents/skills/kuaimai-scm/
+├── SKILL.md
+└── references/
+    ├── kuaimai-scm-domain-routing.md
+    ├── kuaimai-scm-meta-execution.md
+    ├── kuaimai-scm-service.md
+    ├── kuaimai-scm-staff.md
+    ├── kuaimai-scm-logging.md
+    ├── kuaimai-scm-item-base.md
+    └── kuaimai-scm-dsb.md
 ```
 
 **Agent 使用约定**：
 
-- 处理商品域请求前，先 Read `kuaimai-item/SKILL.md`，并按其 **CRITICAL** 提示 Read `kuaimai-shared/SKILL.md`
-- 写操作（`save`、`update-title`）须先 Read 对应 `references/` 文档
+- 处理任何域请求前，先 Read 对应 Skill，并按 **CRITICAL** 提示 Read `kuaimai-shared/SKILL.md`
+- **商品域**：Read `kuaimai-item/SKILL.md`；写操作须先 Read 对应 `references/`
+- **供应链域**：Read `kuaimai-scm/SKILL.md`；统一 `service scm <operation>`（无 shortcuts）；写操作先 Read `references/`
 - 全量翻页时使用 `--page-all`；Agent/脚本续查加 `--page-confirm yes`；限制条数用 `--page-limit`
 
 ## 第 3 步 初始化配置
@@ -65,7 +77,7 @@ kuaimai-cli auth status
 kuaimai-cli doctor --output json
 ```
 
-`doctor` 会检查 `kuaimai-item` Skill 是否已安装且含 `references/`；若缺失请执行 `kuaimai-cli skill install` 或 `kuaimai-cli skill install --if-stale`（覆盖写入，无需手动删除各 Agent 缓存目录）。
+`doctor` 会检查 `kuaimai-item` 与 `kuaimai-scm` Skill 是否已安装且含 `references/`；若缺失请执行 `kuaimai-cli skill install` 或 `kuaimai-cli skill install --if-stale`（覆盖写入，无需手动删除各 Agent 缓存目录）。
 
 ## 第 6 步 升级与 Skill 同步（对标飞书 lark-cli）
 
@@ -84,11 +96,12 @@ kuaimai-cli upgrade --check-only --output json
 
 **说明**：`~/.kuaimai-cli/` 仅存配置与缓存，**不会**阻止 CLI 升级。若 `npx install` 曾提示「已安装 (v0.1.0)，跳过」而版本未变，请用上面 `upgrade` / 重装；`0.1.8` 起向导会对比 npm 包版本并自动 `npm install -g @kuaimai-cli/cli@<目标版本>`。
 
-CLI 会在后台自动将 `kuaimai-shared`、`kuaimai-item` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。手动检查/触发：
+CLI 会在后台自动将 `kuaimai-shared`、`kuaimai-item`、`kuaimai-scm` 同步到最新 Release（状态见 `~/.kuaimai-cli/skill-sync.json`）。手动检查/触发：
 
 ```shell
 kuaimai-cli skill install          # 仅在需要时更新（默认）
 kuaimai-cli skill install --force  # 强制覆盖重装
+kuaimai-cli skill install kuaimai-scm  # 仅重装供应链 Skill
 ```
 
 | 环境变量 | 作用 |

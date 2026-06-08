@@ -3,6 +3,7 @@ package schemacmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/registry"
@@ -34,6 +35,7 @@ func runSchema() error {
 	rows := make([]map[string]any, 0)
 	for _, item := range meta.AllOperations() {
 		op := item.Operation
+		svc := meta.Services[item.Service]
 		row := map[string]any{
 			"service":      item.Service,
 			"operation":    op.Name,
@@ -43,7 +45,10 @@ func runSchema() error {
 			"contentType":  op.ContentType,
 			"write":        op.Write,
 			"pageable":     op.Pageable,
-			"shortcut":     shortcutForOperation(op.Name),
+			"shortcut":     shortcutForOperation(item.Service, op.Name),
+		}
+		if base := strings.TrimSpace(svc.BaseURL); base != "" {
+			row["baseUrl"] = base
 		}
 		if op.RequestSchema != nil {
 			row["requestSchema"] = op.RequestSchema
@@ -62,8 +67,11 @@ func runSchema() error {
 	})
 }
 
-// shortcutForOperation maps meta operation id to item shortcut 子命令（若有）.
-func shortcutForOperation(opName string) string {
+// shortcutForOperation maps meta operation id to shortcut 子命令（若有）.
+func shortcutForOperation(service, opName string) string {
+	if service == "scm" {
+		return "service scm " + opName
+	}
 	switch opName {
 	case "stock-list":
 		return "item +list / item list"

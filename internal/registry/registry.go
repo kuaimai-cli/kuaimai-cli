@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 //go:embed meta_data.json
@@ -54,6 +55,7 @@ type Service struct {
 	Name        string               `json:"-"`
 	Summary     string               `json:"summary"`
 	Description string               `json:"description"`
+	BaseURL     string               `json:"baseUrl,omitempty"`
 	Operations  map[string]Operation `json:"operations"`
 }
 
@@ -114,6 +116,26 @@ func (m *Metadata) ServiceNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// ResolveBaseURL returns the service base URL when set, otherwise fallback (typically config api.url).
+func (s *Service) ResolveBaseURL(fallback string) string {
+	if u := strings.TrimSpace(s.BaseURL); u != "" {
+		return strings.TrimRight(u, "/")
+	}
+	return strings.TrimRight(strings.TrimSpace(fallback), "/")
+}
+
+// ResolveServiceBaseURL looks up a service and returns its effective base URL.
+func (m *Metadata) ResolveServiceBaseURL(svcName, fallback string) string {
+	if m == nil {
+		return strings.TrimRight(strings.TrimSpace(fallback), "/")
+	}
+	svc, ok := m.Services[svcName]
+	if !ok {
+		return strings.TrimRight(strings.TrimSpace(fallback), "/")
+	}
+	return svc.ResolveBaseURL(fallback)
 }
 
 // FindService returns a service by name.
