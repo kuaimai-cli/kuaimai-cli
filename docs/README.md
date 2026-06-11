@@ -1,71 +1,58 @@
 # kuaimai-cli 文档索引
 
-快麦 **erp-items-core** 商品 + **erp-scm** 供应链 CLI，架构对标飞书 [lark-cli](https://github.com/larksuite/lark-cli)。
+快麦 ERP 商品 + 供应链 CLI，架构对标飞书 [lark-cli](https://github.com/larksuite/lark-cli)。
+
+**接口真相源**：远端 [registry.json](http://open-cli.kuaimai.com/registry/registry.json)（v2）→ CLI 本地缓存 → `capabilities` / `schema` / `web call`。
 
 ## 按读者
 
 | 你是… | 从这里开始 |
 |--------|------------|
-| 新用户 / 运维 | 仓库根 [README.md](../README.md) · [每阶段新增能力](./每阶段新增能力.md) |
-| AI Agent / IDE | [Agent 安装指南](./快麦 CLI 安装（Agent 专用）.md) · [Agent 命令选型与 schema 流程](./Agent命令选型与schema流程.md) · 仓库根 [AGENTS.md](../AGENTS.md) |
-| 收到压缩包 / 离线安装 | [开发发布流程 · §6.3 / §7](./快麦%20CLI%20开发发布流程文档.md) |
-| 开发者 / 发版 | [极简命令大全](./快麦%20CLI%20极简可运行命令大全.md) · [开发白皮书](./kuaimai-cli%20开发文档.md) · [开发发布流程](./快麦%20CLI%20开发发布流程文档.md) · [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) · [系统架构与飞书对标](./系统架构与飞书对标说明.md) |
+| 新用户 / 运维 | 仓库根 [README.md](../README.md) |
+| AI Agent / IDE | [Agent 安装指南](./快麦%20CLI%20安装（Agent%20专用）.md) · [Agent 命令选型](./Agent命令选型与schema流程.md) · [AGENTS.md](../AGENTS.md) |
+| 开发者 / 发版 | [开发发布流程](./快麦%20CLI%20开发发布流程文档.md) · [开发白皮书](./kuaimai-cli%20开发文档.md) · [系统架构与飞书对标](./系统架构与飞书对标说明.md) |
+| Registry 接入 | [Registry 远端同步](./Registry远端同步说明.md) · [API 网关转发](./API网关转发说明.md) · [接口 JSON 生成与同步系统设计](./接口JSON生成与同步系统设计.md) |
 | 测试 / 验收 | [验收测试](./kuaimai-cli%20验收测试.md) |
 
 ## 全部文档
 
 | 文档 | 说明 |
 |------|------|
-| [kuaimai-cli 开发文档.md](./kuaimai-cli%20开发文档.md) | 架构、目录规范、分阶段路线图 |
-| [kuaimai-cli meta_data.json 定义规范.md](./kuaimai-cli%20meta_data.json%20定义规范.md) | **元数据唯一规范**：operation 命名、contentType、write/pageable、Schema、分页防护 |
-| [系统架构与飞书对标说明.md](./系统架构与飞书对标说明.md) | 分层图、命令树、飞书差异与后续扩展方向 |
-| [Agent命令选型与schema流程.md](./Agent命令选型与schema流程.md) | Agent 自然语言 → shortcut/service 选型、何时查 schema |
-| [每阶段新增能力.md](./每阶段新增能力.md) | 阶段一～四能力清单与 shortcuts / meta 对照表 |
-| [快麦 CLI 安装（Agent 专用）.md](./快麦 CLI 安装（Agent 专用）.md) | npm / Release / Skill（整目录 + references）/ 鉴权步骤 |
-| [快麦 CLI 极简可运行命令大全.md](./快麦%20CLI%20极简可运行命令大全.md) | **复制即用**：开发自测、推送 PR、Tag 发版、本机升级/重置、用户安装 |
-| [快麦 CLI 开发发布流程文档.md](./快麦%20CLI%20开发发布流程文档.md) | 本地自测、PR/CI、发版前查版本、Tag 发版、Release 观测、升级/重置、十条红线 |
-| [.github/RELEASE_TEMPLATE.md](../.github/RELEASE_TEMPLATE.md) | GitHub Release 手动编辑模板 |
+| [系统架构与飞书对标说明.md](./系统架构与飞书对标说明.md) | 分层图、registry 数据流、命令树、Skill 分工 |
+| [Registry远端同步说明.md](./Registry远端同步说明.md) | 自动同步、ETag、`registry sync/watch` |
+| [API网关转发说明.md](./API网关转发说明.md) | CLI → open-cli 网关 → ERP/SCM、限流与配置 |
+| [接口JSON生成与同步系统设计.md](./接口JSON生成与同步系统设计.md) | api-onboard → open-cli → kuaimai-cli 边界 |
+| [Agent命令选型与schema流程.md](./Agent命令选型与schema流程.md) | 自然语言 → shortcut / web call、何时查 schema |
+| [快麦 CLI 安装（Agent 专用）.md](./快麦%20CLI%20安装（Agent%20专用）.md) | 安装、Skill、registry 验证步骤 |
+| [快麦 CLI 开发发布流程文档.md](./快麦%20CLI%20开发发布流程文档.md) | 本地自测、PR/CI、Tag 发版、npm-skills-sync |
+| [kuaimai-cli 开发文档.md](./kuaimai-cli%20开发文档.md) | 架构白皮书、目录规范、分阶段路线图 |
+| [kuaimai-cli meta_data.json 定义规范.md](./kuaimai-cli%20meta_data.json%20定义规范.md) | 历史 v1 字段规范；新接口见 registry v2 与接口 JSON 设计文档 |
 | [kuaimai-cli 验收测试.md](./kuaimai-cli%20验收测试.md) | 分阶段验收命令与检查项 |
 
-## 当前能力快照（与代码一致，2026-06-08）
+## 当前能力快照（2026-06）
 
-### 三层架构（已定稿）
+### 架构三层
 
-| 层级 | 模块 | 状态 |
+| 层级 | 模块 | 说明 |
 |------|------|------|
-| 底层 | `meta_data.json` | ✅ **v1.7.0**，`item` **1095** + `scm` **195** 个 operation |
-| 中层 | Skill（`kuaimai-item` v2.0.0 + `kuaimai-scm` v1.0.0 + references） | ✅ 执行规则、meta 驱动说明、分页防护、service 兜底指南 |
-| 上层 | item shortcuts（6 子命令）+ `service item|scm` + `api` | ✅ item 双轨；scm 仅 service（无 shortcuts） |
+| 远端 | `registry.json` v2 | `kuaimaierp-cli-auto` 生成 → open-cli 发布 |
+| CLI | capabilities · schema · web call · registry sync | 消费本地缓存 `~/.kuaimai-cli/registry/` |
+| Agent | shared v1.1 + item v3 + scm v2 | **意图路由 + 工作流**；接口发现走 registry |
 
-### 业务与命令
+### 命令
 
-**商品域（item）**
+| 类型 | 示例 |
+|------|------|
+| Shortcuts | `item +list`、`item update-title`（6 个，手写） |
+| Registry | `web call api.luotao.test.get`、`web call scm.staff-query`（待全量发布） |
+| 兜底 | `api POST /path` |
 
-- **shortcuts**：`item +list` / `list` / `count` / `get-detail` / `save` / `update-title`
-- **meta 核心 6 个**（5 有 shortcut + 1 仅 service）：`stock-list`、`stock-count`、`item-query-count`、`item-query-list-v2`、`item-detail`、`item-save`、`item-update-title`
-- **双轨**：Agent **优先 shortcuts**；原子兜底 `service item <operation>`
-- **域名**：config `api.url`（默认 erp1.superboss.cc）
+**已移除**：`service` 命令（统一 `web call <apiId>`）。
 
-**供应链域（scm）**
+### Skill 职责（对标飞书）
 
-- **无 shortcuts**，统一 `service scm <operation>`（自动请求 `https://scm.superboss.cc/`）
-- **Skill 已文档化 10 个核心 operation**：staff、logging、item-base、dsb 等（全量 195 个见 `schema`）
-- **路由**：供应链 / 铺货 / 操作日志 → Read `kuaimai-scm/SKILL.md`
+- `kuaimai-shared`：auth、输出、**registry 发现流程**
+- `kuaimai-item`：商品 shortcuts + references 工作流
+- `kuaimai-scm`：供应链意图路由 + `web call scm.*`
 
-**公共**
-
-- **contentType**：`get_query` · `post_form` · `post_json`
-- **分页**：`--page-all` + **`--page-limit`** + **`--page-confirm`**（500/1000 阈值交互续查，见 `internal/pagination`）
-
-### 平台能力
-
-- **鉴权**：`auth login|logout|status|check|list|use`，多 profile
-- **输出**：`--output table|json|csv|ndjson`；`--dry-run` · `--verbose` · `--no-color`
-- **元数据**：`schema` 全量自省 · `service item|scm <op>` 零代码驱动（required 校验 + Schema 默认值）
-- **Agent**：`doctor`（含 kuaimai-scm Skill 检测）· `upgrade` · `skill install` / `--if-stale`（默认 3 个 Skill）· E2E（`tests/cli_e2e`）
-
-### 框架状态
-
-**meta + Skill + CLI 基础能力已闭环**。后续新增接口只需：登记 meta →（item 可选）补 shortcut/Skill → 验收，**无需改造底层框架**。
-
-变更记录见仓库根 [CHANGELOG.md](../CHANGELOG.md)。
+变更记录：[CHANGELOG.md](../CHANGELOG.md)

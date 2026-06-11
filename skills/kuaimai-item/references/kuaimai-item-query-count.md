@@ -4,7 +4,7 @@
 
 - 用户在**商品档案**维度问「有多少 / 几个 / 总数 / 统计」
 - 筛选含档案字段：`brandNames`、`catIds`、`itemType`、`outerId`、`cIds`、`userIds` 等
-- **无 shortcut**；必须通过 `service item item-query-count`
+- **无 shortcut**；必须通过 `web call item.item-query-count`
 
 与 [`kuaimai-item-count.md`](kuaimai-item-count.md)（`stock-count` / `item count`）的区别见 [`kuaimai-item-count-dimensions.md`](kuaimai-item-count-dimensions.md)。
 
@@ -17,7 +17,7 @@ kuaimai-cli auth status --output json
 ## 命令
 
 ```bash
-kuaimai-cli service item item-query-count \
+kuaimai-cli web call item.item-query-count \
   --body '{"brandNames":"洛可可","pageNo":1,"pageSize":1}' \
   --output json --no-color
 ```
@@ -25,7 +25,7 @@ kuaimai-cli service item item-query-count \
 按标题统计（档案口径）：
 
 ```bash
-kuaimai-cli service item item-query-count \
+kuaimai-cli web call item.item-query-count \
   --body '{"title":"<关键词>","pageNo":1,"pageSize":1}' \
   --output json --no-color
 ```

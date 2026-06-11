@@ -28,10 +28,11 @@
 
 ## 能力快照（主线）
 
-- **meta**：`internal/registry/meta_data.json` **v1.7.0**，`item` **1095** + `scm` **195** 个 operation
-- **shortcuts**：`item +list` / `count` / `get-detail` / `save` / `update-title`（scm 无 shortcuts，走 `service scm`）
-- **分页**：`--page-all` · `--page-limit` · `--page-confirm`（`internal/pagination`）
-- **Skill**：`kuaimai-shared` + `kuaimai-item` v2.0.0（10 refs）+ `kuaimai-scm` v1.0.0（7 refs）
+- **Registry**：远端 `registry.json` v2 + `capabilities` / `schema` / `web call` / `registry sync`
+- **shortcuts**：`item +list` / `count` / `get-detail` / `save` / `update-title`
+- **已移除**：`service` 命令（统一 `web call <apiId>`）
+- **分页**：`--page-all` · `--page-limit` · `--page-confirm`
+- **Skill**：`kuaimai-shared` v1.1 + `kuaimai-item` v3 + `kuaimai-scm` v2（registry 发现进 shared）
 
 ---
 
@@ -80,7 +81,9 @@ kuaimai-cli upgrade   # 默认一键升级；仅检查: --check-only
 
 ```bash
 kuaimai-cli --version
-kuaimai-cli schema --output json | jq '.data.version'
+kuaimai-cli registry sync --output json
+kuaimai-cli capabilities --output json
+kuaimai-cli schema api.luotao.test.get --output json
 kuaimai-cli item +list --body '{"pageNo":1,"pageSize":1}' --output json
 ```
 

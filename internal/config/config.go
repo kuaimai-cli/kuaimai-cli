@@ -9,14 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kuaimai-cli/kuaimai-cli/internal/registry"
 	"github.com/kuaimai-cli/kuaimai-cli/pkg/util"
 	"github.com/spf13/viper"
 )
 
 const (
 	fileName         = "config.yaml"
-	keyAPIURL     = "api.url"
-	keyAPITimeout = "api.timeout"
+	keyAPIURL          = "api.url"
+	keyAPIGatewayURL   = "api.gateway_url"
+	keyAPITimeout      = "api.timeout"
 	keyAPIRetry              = "api.retry"
 	keyAPIPoolMaxIdle        = "api.pool_max_idle"
 	keyAPIPoolMaxIdlePerHost = "api.pool_max_idle_per_host"
@@ -25,9 +27,12 @@ const (
 	keyCLIOutput             = "cli.output"
 	keyCLIColor              = "cli.color"
 	keyAuthProfile           = "auth.profile"
+	keyRegistrySource        = "registry.source"
+	keyRegistryAutoSync      = "registry.auto_sync"
 
-	defaultAPIURL = "https://erp1.superboss.cc/"
-	defaultTimeoutSec = 30
+	defaultAPIURL        = "https://erp1.superboss.cc/"
+	defaultAPIGatewayURL = "https://open-cli.kuaimai.com"
+	defaultTimeoutSec    = 60
 	defaultCLIOutput  = "table"
 	defaultAPIRetry   = 3
 )
@@ -48,6 +53,7 @@ func New() (*Manager, error) {
 	}
 	v.AddConfigPath(dir)
 	v.SetDefault(keyAPIURL, defaultAPIURL)
+	v.SetDefault(keyAPIGatewayURL, defaultAPIGatewayURL)
 	v.SetDefault(keyAPITimeout, defaultTimeoutSec)
 	v.SetDefault(keyCLIOutput, defaultCLIOutput)
 	v.SetDefault(keyAPIRetry, defaultAPIRetry)
@@ -57,6 +63,8 @@ func New() (*Manager, error) {
 	v.SetDefault(keyAPICircuitCooldownSec, 30)
 	v.SetDefault(keyCLIColor, true)
 	v.SetDefault(keyAuthProfile, "default")
+	v.SetDefault(keyRegistrySource, registry.DefaultRegistrySource)
+	v.SetDefault(keyRegistryAutoSync, true)
 	_ = v.ReadInConfig()
 	m := &Manager{v: v}
 	_ = m.ensureProfileRecord("default")
@@ -117,9 +125,32 @@ func (m *Manager) Save() error {
 	return m.v.WriteConfigAs(ConfigPath())
 }
 
+// RegistryAutoSyncEnabled reports whether to check remote registry before each command.
+func (m *Manager) RegistryAutoSyncEnabled() bool {
+	return m.v.GetBool(keyRegistryAutoSync)
+}
+
+// RegistrySource returns registry.json HTTP URL for registry sync.
+func (m *Manager) RegistrySource() string {
+	u := strings.TrimSpace(m.v.GetString(keyRegistrySource))
+	if u != "" {
+		return u
+	}
+	return registry.DefaultRegistrySource
+}
+
 // APIURL returns the configured API base URL (erp1.superboss.cc).
 func (m *Manager) APIURL() string {
 	return m.v.GetString(keyAPIURL)
+}
+
+// APIGatewayURL returns the gateway base URL for API forwarding.
+func (m *Manager) APIGatewayURL() string {
+	u := strings.TrimSpace(m.v.GetString(keyAPIGatewayURL))
+	if u != "" {
+		return u
+	}
+	return defaultAPIGatewayURL
 }
 
 // CLIOutput returns the default CLI output format from config (table/json).

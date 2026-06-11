@@ -13,7 +13,7 @@
 ## staff-query
 
 ```bash
-kuaimai-cli service scm staff-query \
+kuaimai-cli web call scm.staff-query \
   --body '{"queryStaffName":"张三","pageNo":1,"pageSize":20}' \
   --output json --no-color
 ```
@@ -23,7 +23,7 @@ kuaimai-cli service scm staff-query \
 ## staff-show-edit-staff-shop
 
 ```bash
-kuaimai-cli service scm staff-show-edit-staff-shop \
+kuaimai-cli web call scm.staff-show-edit-staff-shop \
   --body '{"staffId":136283493321216}' \
   --output json --no-color
 ```

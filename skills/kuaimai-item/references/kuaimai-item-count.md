@@ -26,7 +26,7 @@ kuaimai-cli item count \
 
 - **contentType**：`post_form` — `--body` JSON 转为 form 表单
 - **pageable**：`false` — `--page-all` 无效
-- **write**：`false` — 不支持 `--dry-run`（走 shortcuts 时）；`service item stock-count` 对查询接口同样拒绝 dry-run
+- **write**：`false` — 不支持 `--dry-run`（走 shortcuts 时）；`web call item.stock-count` 对查询接口同样拒绝 dry-run
 
 筛选字段与 `+list` 相同（`title`、`outerId` 等）；按标题统计时 body **必须**含 `title`。
 
@@ -39,10 +39,10 @@ kuaimai-cli item count \
 - 用户要全量 list 前，**先用 count 评估数据量**，再决定是否 `--page-all`
 - count 比拉全量 list 更轻量，优先用于「有多少个」类问题
 
-## 等价 service 调用
+## 等价 web call
 
 ```bash
-kuaimai-cli service item stock-count \
+kuaimai-cli web call item.stock-count \
   --body '{"title":"<关键词>"}' \
   --output json --no-color
 ```

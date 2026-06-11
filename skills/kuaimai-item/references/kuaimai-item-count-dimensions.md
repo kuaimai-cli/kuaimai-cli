@@ -6,15 +6,15 @@ Agent 在用户问「有多少 / 几个 / 总数」或「列出商品」时，**
 
 | 维度 | meta operation | path | CLI 命令 | shortcut | 典型场景 |
 |------|----------------|------|----------|----------|----------|
-| **库存页**统计 | `stock-count` | `/item/stock/queryCount` | `service item stock-count` | ✅ `item count` | 标题含 XX **有多少**（库存 ARCHIVE_V2 口径） |
-| **商品档案**统计 | `item-query-count` | `/item/queryCount` | `service item item-query-count` | ❌ | 品牌 / 类目 / `itemType` 等档案筛选下 **有多少款** |
-| **商品档案**列表 | `item-query-list-v2` | `/item/queryListV2` | `service item item-query-list-v2` | ❌ | 档案维度 **列出** 商品、取 `sysItemId`；**不要**只为拿 total 而调列表 |
+| **库存页**统计 | `stock-count` | `/item/stock/queryCount` | `web call item.stock-count` | ✅ `item count` | 标题含 XX **有多少**（库存 ARCHIVE_V2 口径） |
+| **商品档案**统计 | `item-query-count` | `/item/queryCount` | `web call item.item-query-count` | ❌ | 品牌 / 类目 / `itemType` 等档案筛选下 **有多少款** |
+| **商品档案**列表 | `item-query-list-v2` | `/item/queryListV2` | `web call item.item-query-list-v2` | ❌ | 档案维度 **列出** 商品、取 `sysItemId`；**不要**只为拿 total 而调列表 |
 
 库存页列表（与上表配对，非 count 接口）：
 
 | 维度 | meta operation | path | CLI | shortcut |
 |------|----------------|------|-----|----------|
-| 库存页列表 | `stock-list` | `/item/stock/queryList` | `service item stock-list` | ✅ `item +list` |
+| 库存页列表 | `stock-list` | `/item/stock/queryList` | `web call item.stock-list` | ✅ `item +list` |
 
 ## 决策流程
 
@@ -25,9 +25,9 @@ flowchart TD
   C -->|是| D{筛选条件}
   C -->|否| L{列表维度}
   D -->|仅标题 / 库存页语境| S[item count / stock-count]
-  D -->|品牌 / 类目 / itemType / 档案字段| A[service item item-query-count]
+  D -->|品牌 / 类目 / itemType / 档案字段| A[web call item.item-query-count]
   L -->|库存页| SL[item +list]
-  L -->|档案 V2| LV[service item item-query-list-v2]
+  L -->|档案 V2| LV[web call item.item-query-list-v2]
 ```
 
 ## 各接口说明
@@ -63,7 +63,7 @@ flowchart TD
 ## 示例：品牌「洛可可」有多少个商品（档案款数）
 
 ```bash
-kuaimai-cli service item item-query-count \
+kuaimai-cli web call item.item-query-count \
   --body '{"brandNames":"洛可可","pageNo":1,"pageSize":1}' \
   --output json --no-color
 # → data.data.total

@@ -2,7 +2,7 @@
 
 快麦 ERP **商品（erp-items-core）** 与 **供应链（erp-scm）** 命令行工具：查商品、改标题、查铺货日志、供应链商品等。输出为结构化 JSON，适合脚本与 AI Agent 调用。架构与交互对标 [飞书 lark-cli](https://github.com/larksuite/lark-cli)。
 
-**能力快照**：`meta_data.json` **v1.7.0**（`item` **1095** + `scm` **195** 个接口契约）· **6** 个 item shortcuts · `service item|scm <operation>` 原子兜底 · 分页防护 `--page-all` / `--page-limit` / `--page-confirm`。
+**能力快照**：远端 **registry.json**（[open-cli.kuaimai.com](http://open-cli.kuaimai.com/registry/registry.json)）· 每次命令前自动同步 · `capabilities` / `schema` / `web call` · **6** 个 item shortcuts · 分页防护 `--page-all` / `--page-limit` / `--page-confirm`。
 
 | 资源 | 链接 |
 |------|------|
@@ -16,9 +16,9 @@
 - 按标题、货号等条件 **搜索商品列表**
 - 查看商品 **详情**（含 SKU）
 - **修改商品标题**（支持 `--dry-run` 预览）
-- 查询 **供应链员工、铺货/操作日志、供应链商品、平台铺货配置**（`service scm`）
+- 查询 **供应链员工、铺货/操作日志、供应链商品、平台铺货配置**（`web call scm.<operation>`）
 - 管理 **配置、鉴权、Skill**（供 Cursor 等 Agent 读取领域约定）
-- 通过 **`schema` / `service`** 调用 meta 已注册的任意 item / scm 接口（无需手写 URL）
+- 通过 **`capabilities` / `schema` / `web call`** 发现并调用远端 registry 已发布接口（无需手写 URL）
 
 ---
 
@@ -111,16 +111,23 @@ kuaimai-cli auth list
 kuaimai-cli skill install
 ```
 
-从 GitHub 安装 `kuaimai-shared` + `kuaimai-item` v2.0.0 + `kuaimai-scm` v1.0.0 **整目录**（含 `references/` 工作流文档），同时写入 `~/.agents/skills`、`~/.cursor/skills` 等 5 个 Agent 目录。仓库内开发时可直接读 `skills/kuaimai-item/SKILL.md` 或 `skills/kuaimai-scm/SKILL.md`。
+从 npm 包安装 `kuaimai-shared` v1.1 + `kuaimai-item` v3 + `kuaimai-scm` v2 **整目录**（含 `references/` 工作流文档），同时写入 `~/.agents/skills`、`~/.cursor/skills` 等 5 个 Agent 目录。仓库内开发时可直接读 `skills/kuaimai-item/SKILL.md` 或 `skills/kuaimai-scm/SKILL.md`。
 
-### 4. 自检
+### 4. 自检（含 registry 自动同步）
 
 ```bash
 kuaimai-cli auth check --output json
 kuaimai-cli doctor --output json
 ```
 
-`doctor` 返回 `ready: true` 表示配置、鉴权、PATH、Skill（含 `references/`）均已就绪。
+首次执行任意业务命令时，CLI 会自动从 `http://open-cli.kuaimai.com/registry/registry.json` 拉取并缓存 registry（对标飞书 lark-cli 的 OpenAPI registry 刷新）。也可手动同步：
+
+```bash
+kuaimai-cli registry sync --output json
+kuaimai-cli capabilities --output json
+```
+
+`doctor` 返回 `ready: true` 表示配置、鉴权、registry、PATH、Skill（含 `references/`）均已就绪。
 
 ### 5. 试一条商品查询
 
@@ -157,8 +164,8 @@ kuaimai-cli item +list \
   --body '{"title":"关键字","pageNo":1,"pageSize":50}' \
   --page-all --page-limit 200 --page-confirm yes --output json
 
-# 商品档案 V2 列表（无 shortcut，走 service）
-kuaimai-cli service item item-query-list-v2 \
+# 商品档案 V2 列表（无 shortcut，走 web call）
+kuaimai-cli web call item.item-query-list-v2 \
   --body '{"title":"关键字","pageNo":1,"pageSize":20}' \
   --output json
 
@@ -187,31 +194,31 @@ kuaimai-cli auth logout
 
 ### 供应链（scm）
 
-scm 域暂无 shortcuts，统一走 `service scm`（自动请求 `https://scm.superboss.cc/`）：
+scm 域暂无 shortcuts，统一走 `web call scm.<operation>`（自动请求 `https://scm.superboss.cc/`）：
 
 ```bash
 # 员工列表
-kuaimai-cli service scm staff-query \
+kuaimai-cli web call scm.staff-query \
   --body '{"pageNo":1,"pageSize":20}' \
   --output json
 
 # 铺货日志（多数日志接口需 startTime/endTime）
-kuaimai-cli service scm logging-publish-log \
+kuaimai-cli web call scm.logging-publish-log \
   --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}' \
   --output json
 
 # 供应链商品列表
-kuaimai-cli service scm item-base-page \
+kuaimai-cli web call scm.item-base-page \
   --body '{"pageNo":1,"pageSize":50}' \
   --output json
 
 # 平台铺货配置
-kuaimai-cli service scm dsb-query-distribution-config \
-  --body '{"shopType":"TouTiaoFXG"}' \
+kuaimai-cli web call scm.dsb-query-distribution-config \
+  --params '{"shopType":"TouTiaoFXG"}' \
   --output json
 ```
 
-详见 `skills/kuaimai-scm/SKILL.md`。**勿与 item 混用**：路径同为 `/item/*` 时，`service item`（erp1）与 `service scm`（scm）语义不同。
+详见 `skills/kuaimai-scm/SKILL.md`。**勿与 item 混用**：路径同为 `/item/*` 时，`web call item.*`（erp1）与 `web call scm.item-*`（scm）语义不同。
 
 ### Skill
 
@@ -221,16 +228,33 @@ kuaimai-cli skill install              # kuaimai-shared + kuaimai-item + kuaimai
 kuaimai-cli skill install kuaimai-scm  # 单个 Skill
 ```
 
-### 元数据与原子 API
+### Registry 接口发现与调用（对标飞书 CLI）
+
+远端 registry 由 `kuaimaierp-cli-auto` 发布至 `kuaimai-cli-open`，CLI **每次启动命令前**自动检查 version/ETag 并更新本地缓存 `~/.kuaimai-cli/registry/registry.json`。
 
 ```bash
-# 自省全部接口（1290 个 operation：item 1095 + scm 195）
-kuaimai-cli schema --output json
+# 列出全部已发布接口
+kuaimai-cli capabilities --output json
 
-# 原子调用（operation 名见 schema，如 stock-list，非子命令名 list）
-kuaimai-cli service item stock-list \
-  --body '{"title":"关键字","pageNo":1,"pageSize":20}' \
+# 单接口 schema 自省
+kuaimai-cli schema api.luotao.test.get --output json
+
+# 按 apiId 调用（推荐，与 registry 示例一致）
+kuaimai-cli web call api.luotao.test.get \
+  --params '{"keyword":"测试商品"}' \
   --output json
+
+# 手动同步 / 开发时监听远端变化
+kuaimai-cli registry sync --output json
+kuaimai-cli registry watch --interval 30 --verbose
+```
+
+配置（`~/.kuaimai-cli/config.yaml`）：
+
+```yaml
+registry:
+  source: "http://open-cli.kuaimai.com/registry/registry.json"
+  auto_sync: true   # 默认开启；设 false 或 KUAIMAI_CLI_SKIP_REGISTRY_SYNC=1 可跳过
 ```
 
 ### 其它
@@ -300,6 +324,7 @@ npm install -g @kuaimai-cli/cli@latest
 | 现象 | 处理 |
 |------|------|
 | `auth check` 失败 / 401 | 重新 `auth login`；确认 token 未过期 |
+| `本地 registry 未同步` | 执行任意命令会自动同步；或 `kuaimai-cli registry sync` |
 | `doctor` 中 Skill 未就绪 | `kuaimai-cli skill install` 或 `skill install --if-stale`（覆盖写入，一般无需手删缓存） |
 | `npx install` 显示「已安装跳过」但仍是旧版 | `kuaimai-cli upgrade` 或 `npm install -g @kuaimai-cli/cli@latest`（0.1.8+ 向导已自动比对版本） |
 | 不知道有新版本 | 日常用 CLI 即可（stderr 提示）；或 `kuaimai-cli upgrade` |
@@ -308,7 +333,7 @@ npm install -g @kuaimai-cli/cli@latest
 | checksum 校验失败 | 重打 tag 后须重新 `npm publish`，使包内 `checksums.txt` 与 Release 一致 |
 | 写操作不敢直接执行 | 所有写接口先加 `--dry-run` 预览请求体 |
 | `--page-all` 中途停止 | 非交互环境达阈值会停止；加 `--page-confirm yes` 或 `--page-limit` |
-| `item +list` 不支持 dry-run | 查询接口；用 `service` 写接口才支持 `--dry-run` |
+| `item +list` 不支持 dry-run | 查询接口；用 `web call` 写接口（`write:true`）才支持 `--dry-run` |
 
 ---
 
@@ -318,8 +343,9 @@ npm install -g @kuaimai-cli/cli@latest
 - Agent 行为约定见仓库根目录 [AGENTS.md](AGENTS.md)
 - Skill 安装后位于 `~/.agents/skills/kuaimai-{shared,item,scm}/`（含 `SKILL.md` 与 `references/`）
 - 商品域：先 Read `kuaimai-item/SKILL.md` → 写操作再 Read 对应 `references/` 文档
-- 供应链域：先 Read `kuaimai-scm/SKILL.md` → `service scm <operation>`（无 shortcuts）
-- 无 shortcut 的 item 接口（如 `item-query-list-v2`）：Read `references/kuaimai-item-service.md`
+- 供应链域：先 Read `kuaimai-scm/SKILL.md` → `web call scm.<operation>`（无 shortcuts）
+- 先 Read `kuaimai-shared/SKILL.md`（registry 发现流程）
+- 无 shortcut 的 item 接口：Read `references/kuaimai-item-web-call.md` + `schema <apiId>`
 - 全量翻页：非交互执行加 `--page-confirm yes`；见各域 `references/*-meta-execution.md`
 - 命令选型见 [Agent 命令选型与 schema 流程](docs/Agent命令选型与schema流程.md)
 
@@ -338,14 +364,16 @@ npm install -g @kuaimai-cli/cli@latest
 | 文档 | 说明 |
 |------|------|
 | [文档索引](docs/README.md) | 全部文档入口 |
-| [meta_data.json 定义规范](docs/kuaimai-cli%20meta_data.json%20定义规范.md) | operation 命名、contentType、Schema、双轨命令 |
+| [Registry 远端同步说明](docs/Registry远端同步说明.md) | 自动同步、capabilities、web call |
+| [接口 JSON 生成与同步系统设计](docs/接口JSON生成与同步系统设计.md) | api-onboard → open-cli 边界 |
+| [meta_data.json 定义规范](docs/kuaimai-cli%20meta_data.json%20定义规范.md) | 历史 v1 字段语义；新接口见 registry v2 |
 | [开发发布流程](docs/快麦%20CLI%20开发发布流程文档.md) | npm 安装/升级、CI/Release、内网 dist |
 | [GitHub Release 模板](.github/RELEASE_TEMPLATE.md) | 手动编辑 Release 说明时参考 |
 | [Agent 安装指南](docs/快麦 CLI 安装（Agent 专用）.md) | Cursor / Codex 等 IDE |
-| [Agent 命令选型与 schema 流程](docs/Agent命令选型与schema流程.md) | shortcut/service 选型、何时查 schema |
+| [Agent 命令选型与 schema 流程](docs/Agent命令选型与schema流程.md) | shortcut / web call 选型、何时查 schema |
+| [Registry 远端同步说明](docs/Registry远端同步说明.md) | 自动同步、web call、watch 开发 |
 | [开发白皮书](docs/kuaimai-cli%20开发文档.md) | 架构与规划（维护者） |
 | [系统架构与飞书对标](docs/系统架构与飞书对标说明.md) | 分层、命令树、分页防护 |
-| [每阶段新增能力](docs/每阶段新增能力.md) | 版本能力对照 |
 | [验收测试](docs/kuaimai-cli%20验收测试.md) | 分阶段验收清单 |
 
 ---

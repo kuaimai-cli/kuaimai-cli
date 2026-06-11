@@ -8,8 +8,8 @@
 
 | 项 | 说明 |
 |----|------|
-| 业务域 | 商品 list / count / 详情 / 改标题（`item` shortcuts）；供应链 staff / 日志 / 商品 / 铺货配置（`service scm`） |
-| 元数据 | `meta_data.json` **v1.7.0**，`item` **1095** + `scm` **195** 个接口（`schema` / `service item|scm`） |
+| 业务域 | 商品 list / count / 详情 / 改标题（`item` shortcuts）；供应链 staff / 日志 / 商品 / 铺货配置（`web call`） |
+| Registry | 远端 `registry.json` **v2**（open-cli 自动同步）· `capabilities` / `schema` / `web call` |
 | 分页 | `--page-all` · `--page-limit` · `--page-confirm`（海量数据防护） |
 | Agent | `skill install`（shared + item + scm）/ `--if-stale`；`upgrade` 默认一键升级 + stderr 新版本提示 |
 
@@ -93,7 +93,7 @@ kuaimai-cli --version
 
 - Node.js **16+**
 - 网络可访问 `github.com`（下载 Release 二进制）
-- 业务请求：商品默认 `https://erp1.superboss.cc/`；供应链 `https://scm.superboss.cc/`（`service scm` 自动使用）
+- 业务请求：商品默认 `https://erp1.superboss.cc/`；供应链 `https://scm.superboss.cc/`（`web call` 自动使用）
 
 ## 文档
 

@@ -7,7 +7,8 @@ const DefaultConfigTemplate = `# kuaimai-cli 本地默认配置（自动生成�
 
 api:
   url: "https://erp1.superboss.cc/"
-  timeout: 30
+  gateway_url: "https://open-cli.kuaimai.com"
+  timeout: 60
   retry: 3
   pool_max_idle: 100
   pool_max_idle_per_host: 10
@@ -17,6 +18,11 @@ api:
 cli:
   output: "table"
   color: true
+
+# Registry 远程源（对标飞书 CLI OpenAPI registry 刷新）
+registry:
+  source: "http://open-cli.kuaimai.com/registry/registry.json"
+  auto_sync: true   # 每次命令前自动检查远端 version/ETag 并更新本地缓存
 
 # 多账号 profile：auth login --profile <name>；切换：auth use <name>
 auth:

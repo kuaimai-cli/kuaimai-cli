@@ -59,15 +59,15 @@ kuaimai-cli item +list \
 
 逗号分隔字符串，非数组：`"userIds": "100,200"`
 
-### 等价 service 调用
+### 等价 web call
 
 ```bash
-kuaimai-cli service item stock-list \
+kuaimai-cli web call item.stock-list \
   --body '{"title":"<关键词>","pageNo":1,"pageSize":50}' \
   --output json --no-color
 ```
 
-service 层无 ARCHIVE_V2 默认 body；若报错，参考 `item +list --help` 默认 body 补全字段。
+`web call item.stock-list` 无 ARCHIVE_V2 默认 body；若报错，参考 `item +list --help` 默认 body 补全字段。
 
 ## 响应解析
 

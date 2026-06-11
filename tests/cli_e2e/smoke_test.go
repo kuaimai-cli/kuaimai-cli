@@ -13,10 +13,10 @@ import (
 )
 
 type envelope struct {
-	OK    bool           `json:"ok"`
+	OK    bool            `json:"ok"`
 	Data  json.RawMessage `json:"data"`
-	Error string         `json:"error"`
-	Hint  string         `json:"hint"`
+	Error string          `json:"error"`
+	Hint  string          `json:"hint"`
 }
 
 func TestSmokeConfigAuthDryRun(t *testing.T) {
@@ -32,7 +32,6 @@ func TestSmokeConfigAuthDryRun(t *testing.T) {
 		t.Fatalf("config get failed: %s", env.Error)
 	}
 
-	// init again should not overwrite
 	runOK(t, bin, "config", "init")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,10 +76,97 @@ func TestSmokeConfigAuthDryRun(t *testing.T) {
 		t.Fatalf("expected dry_run=true in data: %s", env.Data)
 	}
 
+	seedRegistryCache(t, home)
 	schemaOut := runOK(t, bin, "schema", "--output", "json")
 	mustJSON(t, schemaOut, &env)
 	if !env.OK {
-		t.Fatalf("schema failed")
+		t.Fatalf("schema failed: %s", env.Error)
+	}
+}
+
+func TestRegistryWebCallCapabilities(t *testing.T) {
+	bin := buildCLI(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	seedRegistryCache(t, home)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/luotao/test/get":
+			if got := r.URL.Query().Get("keyword"); got != "hello" {
+				http.Error(w, "bad keyword", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"suc":true,"data":{"items":[]}}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/luotao/test/post":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"suc":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	tokenFile := filepath.Join(home, ".kuaimai-cli", "tokens.json")
+	t.Setenv("KUAIMAI_CLI_TOKEN_FILE", tokenFile)
+	runOK(t, bin, "config", "init")
+	runOK(t, bin, "config", "set", "api.url", srv.URL)
+	runOK(t, bin, "auth", "login", "test-token-12345678")
+
+	var env envelope
+
+	capOut := runOK(t, bin, "capabilities", "--output", "json")
+	mustJSON(t, capOut, &env)
+	if !env.OK {
+		t.Fatalf("capabilities: %s", env.Error)
+	}
+	var capData map[string]any
+	if err := json.Unmarshal(env.Data, &capData); err != nil {
+		t.Fatal(err)
+	}
+	if capData["total"].(float64) != 2 {
+		t.Fatalf("expected 2 capabilities, got %v", capData["total"])
+	}
+
+	oneOut := runOK(t, bin, "schema", "api.luotao.test.get", "--output", "json")
+	mustJSON(t, oneOut, &env)
+	if !env.OK {
+		t.Fatalf("schema one: %s", env.Error)
+	}
+
+	getOut := runOK(t, bin, "web", "call", "api.luotao.test.get", "--params", `{"keyword":"hello"}`, "--output", "json")
+	mustJSON(t, getOut, &env)
+	if !env.OK {
+		t.Fatalf("web call get: %s %s", env.Error, env.Hint)
+	}
+
+	postOut := runOK(t, bin, "web", "call", "api.luotao.test.post", "--data", `{"title":"x"}`, "--output", "json")
+	mustJSON(t, postOut, &env)
+	if !env.OK {
+		t.Fatalf("web call post: %s %s", env.Error, env.Hint)
+	}
+
+	bodyOut := runOK(t, bin, "web", "call", "api.luotao.test.get", "--body", `{"keyword":"hello"}`, "--output", "json")
+	mustJSON(t, bodyOut, &env)
+	if !env.OK {
+		t.Fatalf("web call --body: %s %s", env.Error, env.Hint)
+	}
+}
+
+func seedRegistryCache(t *testing.T, home string) {
+	t.Helper()
+	src := filepath.Join(projectRoot(t), "internal", "registry", "testdata", "registry.json")
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(home, ".kuaimai-cli", "registry")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "registry.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -102,7 +188,6 @@ func projectRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// tests/cli_e2e -> repo root
 	return filepath.Clean(filepath.Join(wd, "..", ".."))
 }
 

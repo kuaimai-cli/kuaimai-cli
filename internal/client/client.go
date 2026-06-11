@@ -25,11 +25,12 @@ import (
 
 // Client is the unified HTTP client for kuaimai API.
 type Client struct {
-	baseURL      string
-	httpClient   *http.Client
-	authStore    *auth.Store
-	dryRun       bool
-	maxRetry int
+	baseURL    string
+	gatewayURL string
+	httpClient *http.Client
+	authStore  *auth.Store
+	dryRun     bool
+	maxRetry   int
 }
 
 // New builds a client from config and auth store.
@@ -46,8 +47,10 @@ func New(cfg *config.Manager, store *auth.Store, dryRun bool) (*Client, error) {
 		profile = store.Profile()
 	}
 	base := cfg.ProfileAPIURL(profile)
+	gateway := strings.TrimRight(cfg.APIGatewayURL(), "/")
 	return &Client{
-		baseURL: strings.TrimRight(base, "/"),
+		baseURL:    strings.TrimRight(base, "/"),
+		gatewayURL: gateway,
 		httpClient: &http.Client{
 			Timeout:   timeout,
 			Transport: transport,
@@ -65,17 +68,18 @@ func (c *Client) Request(ctx context.Context, method, path string, body []byte) 
 
 func (c *Client) requestWithRetry(ctx context.Context, method, path string, body []byte, contentType string) (any, int, error) {
 	method = strings.ToUpper(method)
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	urlStr := c.baseURL + path
+	pathOnly, queryParams := splitPathQuery(path)
+	targetURL := buildTargetURL(c.baseURL, pathOnly, queryParams)
 
 	if c.dryRun {
-		logger.Info("dry-run: %s %s", method, urlStr)
+		logger.Info("dry-run: %s %s (via gateway %s/api/forward)", method, targetURL, c.gatewayURL)
 		return map[string]any{
-			"dry_run": true,
-			"method":  method,
-			"url":     urlStr,
+			"dry_run":     true,
+			"method":      method,
+			"url":         targetURL,
+			"gateway":     c.gatewayURL + "/api/forward",
+			"target_host": c.baseURL,
+			"path":        pathOnly,
 		}, 200, nil
 	}
 
@@ -95,7 +99,7 @@ func (c *Client) requestWithRetry(ctx context.Context, method, path string, body
 			}
 		}
 
-		data, code, err := c.doOnce(ctx, method, urlStr, body, contentType)
+		data, code, err := c.doOnce(ctx, method, pathOnly, queryParams, body, contentType)
 		if err == nil {
 			return data, code, nil
 		}
@@ -108,39 +112,51 @@ func (c *Client) requestWithRetry(ctx context.Context, method, path string, body
 	return nil, 0, lastErr
 }
 
-func (c *Client) doOnce(ctx context.Context, method, urlStr string, body []byte, contentType string) (any, int, error) {
+func (c *Client) doOnce(ctx context.Context, method, pathOnly string, queryParams map[string]string, body []byte, contentType string) (any, int, error) {
 	token, err := c.authStore.GetToken()
 	if err != nil {
 		return nil, 0, fmt.Errorf("未登录，%s", auth.LoginHint)
 	}
 
-	var bodyReader io.Reader
-	if len(body) > 0 {
-		bodyReader = bytes.NewReader(body)
+	forwardBody := map[string]any{
+		"targetHost": c.baseURL,
+		"method":     method,
+		"path":       pathOnly,
 	}
-	req, err := http.NewRequestWithContext(ctx, method, urlStr, bodyReader)
+	if len(queryParams) > 0 {
+		forwardBody["queryParams"] = queryParams
+	}
+	if len(body) > 0 {
+		forwardBody["body"] = string(body)
+	}
+	if contentType != "" {
+		forwardBody["contentType"] = contentType
+	} else if len(body) > 0 {
+		forwardBody["contentType"] = "application/json"
+	}
+
+	payload, err := json.Marshal(forwardBody)
+	if err != nil {
+		return nil, 0, fmt.Errorf("构建网关请求失败: %w", err)
+	}
+
+	gatewayURL := c.gatewayURL + "/api/forward"
+	targetURL := buildTargetURL(c.baseURL, pathOnly, queryParams)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gatewayURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, 0, fmt.Errorf("创建请求失败: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(auth.HeaderAccessToken, token)
-	if bodyReader != nil {
-		if contentType == "" {
-			contentType = "application/json"
-		}
-		req.Header.Set("Content-Type", contentType)
-	}
 
 	preview := auth.TokenPreview(token)
-	logger.Debug("%s %s", method, urlStr)
+	logger.Debug("POST %s -> %s %s", gatewayURL, method, targetURL)
 	logger.Debug("request header %s: %s (len=%d)", auth.HeaderAccessToken, preview, len(token))
-	if bodyReader != nil {
-		logger.Debug("request Content-Type: %s", contentType)
-		if len(body) > 0 && len(body) <= 4096 {
-			logger.Debug("request body: %s", sanitize.JSONString(string(body)))
-		} else if len(body) > 4096 {
-			logger.Debug("request body: (%d bytes, truncated in log)", len(body))
-		}
+	if len(body) > 0 && len(body) <= 4096 {
+		logger.Debug("request body: %s", sanitize.JSONString(string(body)))
+	} else if len(body) > 4096 {
+		logger.Debug("request body: (%d bytes, truncated in log)", len(body))
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -171,8 +187,11 @@ func (c *Client) doOnce(ctx context.Context, method, urlStr string, body []byte,
 
 	if resp.StatusCode >= 400 {
 		msg := fmt.Sprintf("接口返回 %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusTooManyRequests {
+			msg = "请求过于频繁，请稍后重试"
+		}
 		if m, ok := parsed.(map[string]any); ok {
-			if e, ok := m["message"].(string); ok && e != "" {
+			if e, ok := m["message"].(string); ok && e != "" && resp.StatusCode != http.StatusTooManyRequests {
 				msg = e
 			}
 		}
@@ -331,7 +350,7 @@ func friendlyNetworkErr(err error) error {
 			return fmt.Errorf("请求超时，请检查网络或调大 api.timeout 配置")
 		}
 	}
-	return fmt.Errorf("无法连接 API 服务，请检查 api.url 配置与服务是否可用")
+	return fmt.Errorf("无法连接 API 网关，请检查 api.gateway_url 配置与服务是否可用")
 }
 
 func statusHint(code int) string {
@@ -340,6 +359,8 @@ func statusHint(code int) string {
 		return "请检查路径是否正确，或使用 kuaimai-cli --help 查看可用命令"
 	case http.StatusUnauthorized:
 		return "凭证无效或已过期，请执行 kuaimai-cli auth login <accessToken> 重新登录"
+	case http.StatusTooManyRequests:
+		return "请求过于频繁，请稍后重试"
 	case http.StatusInternalServerError:
 		return "服务端异常，请稍后重试或联系平台管理员"
 	default:
@@ -356,6 +377,45 @@ func (c *Client) WithBaseURL(baseURL string) *Client {
 	cp := *c
 	cp.baseURL = strings.TrimRight(baseURL, "/")
 	return &cp
+}
+
+func splitPathQuery(path string) (string, map[string]string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		path = "/"
+	} else if path[0] != '/' {
+		path = "/" + path
+	}
+	u, err := url.Parse(path)
+	if err != nil {
+		return path, nil
+	}
+	pathOnly := u.Path
+	if pathOnly == "" {
+		pathOnly = "/"
+	}
+	if u.RawQuery == "" {
+		return pathOnly, nil
+	}
+	qp := make(map[string]string)
+	for k, vs := range u.Query() {
+		if len(vs) > 0 {
+			qp[k] = vs[0]
+		}
+	}
+	return pathOnly, qp
+}
+
+func buildTargetURL(baseURL, pathOnly string, queryParams map[string]string) string {
+	target := strings.TrimRight(baseURL, "/") + pathOnly
+	if len(queryParams) == 0 {
+		return target
+	}
+	q := url.Values{}
+	for k, v := range queryParams {
+		q.Set(k, v)
+	}
+	return target + "?" + q.Encode()
 }
 
 // PostJSON marshals v and POSTs to path.

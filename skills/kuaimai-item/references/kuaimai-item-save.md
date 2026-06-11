@@ -37,10 +37,10 @@ kuaimai-cli item save \
 - 详情中 `itemSuiteBridgeList` 保存时需映射为 `suiteBridgeList`
 - 其它字段保持 get-detail 原样，避免覆盖丢失
 
-## 与 service 层的区别
+## 与 web call 的区别
 
-- `kuaimai-cli service item item-save` 为原子 API，**不会**自动 get-detail；需自行构造完整 `--body`
-- `kuaimai-cli service item item-update-title` 在 meta 中登记为写操作，但**无** get-detail 编排
+- `kuaimai-cli web call item.item-save` 为原子 API，**不会**自动 get-detail；需自行构造完整 `--body`
+- `kuaimai-cli web call item.item-update-title` 在 meta 中登记为写操作，但**无** get-detail 编排
 
 ## 禁止
 

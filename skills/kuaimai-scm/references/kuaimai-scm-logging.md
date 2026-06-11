@@ -28,7 +28,7 @@ Agent 未指定时，默认近 7 天并向用户说明。
 ## 铺货日志
 
 ```bash
-kuaimai-cli service scm logging-publish-log \
+kuaimai-cli web call scm.logging-publish-log \
   --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59","outerId":"款式编码"}' \
   --output json --no-color
 ```
@@ -38,7 +38,7 @@ kuaimai-cli service scm logging-publish-log \
 ## queryChannelByType
 
 ```bash
-kuaimai-cli service scm logging-query-channel-by-type \
+kuaimai-cli web call scm.logging-query-channel-by-type \
   --body '{"type":1}' --output json --no-color
 ```
 
@@ -52,7 +52,7 @@ kuaimai-cli service scm logging-query-channel-by-type \
 ## 商品编辑日志
 
 ```bash
-kuaimai-cli service scm logging-product-edit-log-page \
+kuaimai-cli web call scm.logging-product-edit-log-page \
   --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59","outerId":"款式编码"}' \
   --output json --no-color
 ```

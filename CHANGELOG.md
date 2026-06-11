@@ -4,11 +4,32 @@
 
 ## Unreleased
 
+## 0.2.3
+
 ### Added
+
+- **Registry 远端同步**：`registry sync` / `registry watch`；命令前 `SyncIfNeeded` 自动拉取 `registry.source`（默认 `http://open-cli.kuaimai.com/registry/registry.json`）；新增 `capabilities`、`web call`
+- **API 网关转发**：业务 HTTP 统一经 `api.gateway_url`（默认 `https://open-cli.kuaimai.com`）的 `POST /api/forward` 转发至 ERP/SCM；配置项 `api.gateway_url`；文档 [API网关转发说明](./docs/API网关转发说明.md)
+- **`web call --body`**：统一请求体参数（按 `contentType` 自动转为 `--params` 或 `--data`），兼容原 `service` 调用习惯
+- **`schema [apiId]`**：优先输出 registry v2 字段（`domain`、`title`、`transport` 等）
+
+### Removed
+
+- **`service` 命令**：registry 接口统一走 `web call <apiId>`（对标飞书域命令，避免与 `service` 子命令重复）
+
+### Changed
+
+- **`api.timeout` 默认 60s**（与网关上游超时一致）
+- **`kuaimai-shared` v1.2.0**：补充网关配置与 429 排错说明
+- **Registry 消费路径**：`capabilities` → `schema` → `web call`；文档与 Skill 全面移除 `service item|scm` 写法
+- **`bootstrapRegistry`**：同步后不再动态注册 `service` 子命令树
+- **Skill 对标飞书瘦身**：`kuaimai-shared` v1.1 增加 registry 发现流程；`kuaimai-item` v3 / `kuaimai-scm` v2 移除硬编码 meta 表，仅保留意图路由、shortcuts 与 references；`kuaimai-*-service.md` 重命名为 `kuaimai-*-web-call.md`
+
+### Added (prior)
 
 - **meta_data.json v1.7.0**：新增 `scm` 域 **195** 个 operation（erp-scm staff/logging/item/dsb）；`item` 域 **1095** 个 operation；scm 使用 meta `baseUrl`（`https://scm.superboss.cc/`）
 - **Skill kuaimai-scm v1.0.0**：供应链域路由 + **7** 个 `references/`（domain-routing、meta-execution、service、staff、logging、item-base、dsb）
-- **`service scm <operation>`**：meta 驱动，自动请求 scm 域名；与 item 共用分页/dry-run/Schema 管线
+- **`web call scm.<operation>`**：meta 驱动，自动请求 scm 域名；与 item 共用分页/dry-run/Schema 管线
 - **scm meta 生成脚本**：`scripts/generate_meta/generate_scm_meta.py`、`scripts/normalize_meta/normalize_scm_meta.py`
 - **`doctor`**：新增 `skill_kuaimai_scm` 检查（含 `references/`）
 - **`skill install`**：默认安装 `kuaimai-shared` + `kuaimai-item` + `kuaimai-scm`
@@ -16,7 +37,7 @@
 ### Changed
 
 - **文档全量对齐 v1.7.0**：README、`docs/` 索引、架构说明、Agent 选型、安装指南、验收测试、每阶段能力
-- **`AGENTS.md`**：补充 scm 域路由与 `service scm` 示例
+- **`AGENTS.md`**：补充 scm 域路由与 `web call` 示例
 - **Skill 自动同步**：任意命令结束后后台执行 `install --if-stale` 逻辑（未安装 / Release 更新 / CLI 版本变化，24h Release 查询缓存）；`skill install` 无参数时默认等同 `--if-stale`，强制重装用 `--force`
 
 ### Fixed
@@ -39,7 +60,7 @@
 - **meta_data.json v1.6.0**：`item` 域 **1157** 个 operation（erp-items-core `/item` Controller 全量注册）
 - **`internal/pagination`**：`--page-all` 海量数据防护（500/1000 条阈值、交互 `[y/N]`、分片合并）
 - 全局参数 **`--page-limit`**、**`--page-confirm`**（`prompt` | `yes` | `no`）
-- **`service item item-query-list-v2`** 等 meta 驱动命令（无 shortcut 的接口走 service）
+- **`web call item.item-query-list-v2`** 等 meta 驱动命令（无 shortcut 的接口走 service）
 - Skill **kuaimai-item v2.0.0**：架构分层说明 + 3 份新 references（meta-execution、service、query-list-v2）
 - `auth check`：探测 accessToken 与 API 连通性
 - `auth list` / `auth use` / `auth login --profile`：多账号 profile
@@ -59,7 +80,7 @@
 - Skill 飞书风格对齐：`kuaimai-shared`、`kuaimai-item` 重写；`kuaimai-item/references/` 扩展至 **8** 份
 - `skill install`：GitHub Contents API 递归安装整目录；API 失败时回退仅 `SKILL.md`
 - `doctor`：检测 `kuaimai-item` 是否含 `references/` 目录
-- `service` 层：`contentType` 路由、`requestSchema` required 轻校验、Schema 默认值
+- `web call`：`contentType` 路由、`requestSchema` required 轻校验、Schema 默认值
 - `config init` 模板增加 `auth.profile` / `auth.profiles`
 - `AGENTS.md`：补充分页参数与 service 兜底说明
 

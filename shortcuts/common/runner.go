@@ -36,7 +36,7 @@ type WriteOptions struct {
 	Body        any
 	FormEncoded bool // 与浏览器一致：application/x-www-form-urlencoded
 	BaseURL     string
-	// PageAll 为 nil 时使用全局 --page-all；service 层可设为仅 pageable 操作翻页。
+	// PageAll 为 nil 时使用全局 --page-all；web call 可设为仅 pageable 操作翻页。
 	PageAll *bool
 }
 

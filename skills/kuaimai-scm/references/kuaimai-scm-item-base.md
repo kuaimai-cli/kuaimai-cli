@@ -13,7 +13,7 @@
 ## 商品列表
 
 ```bash
-kuaimai-cli service scm item-base-page \
+kuaimai-cli web call scm.item-base-page \
   --body '{"pageNo":1,"pageSize":50,"title":"关键字","outerIdBlur":1}' \
   --output json --no-color
 ```
@@ -32,7 +32,7 @@ kuaimai-cli service scm item-base-page \
 ## 商品详情
 
 ```bash
-kuaimai-cli service scm item-base-detail \
+kuaimai-cli web call scm.item-base-detail \
   --body '{"baseItemId":123456}' \
   --output json --no-color
 ```

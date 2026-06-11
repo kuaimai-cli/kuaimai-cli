@@ -1,7 +1,7 @@
 # kuaimai-cli 阶段开发准入、最低可用标准、阶段验收测试规范
 
-> 对标飞书 CLI；与 [开发文档](./kuaimai-cli%20开发文档.md)、[meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)、[每阶段新增能力](./每阶段新增能力.md)、[系统架构说明](./系统架构与飞书对标说明.md) 保持一致。  
-> **当前业务验收基准**：**erp-items-core 商品域**（标题查改）+ **erp-scm 供应链域**（`service scm` 只读查询）。
+> 对标飞书 CLI；与 [开发文档](./kuaimai-cli%20开发文档.md)、[Registry 同步](./Registry远端同步说明.md)、[系统架构说明](./系统架构与飞书对标说明.md) 保持一致。  
+> **当前业务验收基准**：**erp-items-core 商品域**（标题查改）+ **erp-scm 供应链域**（`web call` 只读查询）。
 
 ---
 
@@ -13,7 +13,7 @@
 | 最低可用 | **阶段一**通过即可使用配置、鉴权、`api`、结构化输出 |
 | 日常业务 | **阶段三** + **item shortcuts**（标题查询与修改） |
 | 阶段一 | MVP ~60%：基建 + 三级命令形态 |
-| 阶段二 | 企业版 ~80%：runner、schema/service、重试、completion |
+| 阶段二 | 企业版 ~80%：runner、schema/web call、重试、completion |
 | 阶段三 | 平台 ~95%：item 域、Skill、csv/ndjson、脱敏、page-all、**标题闭环** |
 
 ---
@@ -23,7 +23,7 @@
 | 阶段 | 可使用 CLI | 可投入业务 | 飞书完成度 |
 |------|------------|------------|------------|
 | 一 | ✅ | ✅ 基建与 `api` | ~60% |
-| 二 | ✅ | ✅ schema/service、执行管线 | ~80% |
+| 二 | ✅ | ✅ schema/web call、执行管线 | ~80% |
 | 三 | ✅ | ✅ **商品标题** list/save/update-title 等 | ~95% |
 | 四 | ✅ 部分 | E2E、doctor/upgrade、多账号、扩域仍规划 | ~98% |
 
@@ -50,7 +50,9 @@ kuaimai-cli --verbose config get
 kuaimai-cli config init
 kuaimai-cli config get
 kuaimai-cli config get api.url
+kuaimai-cli config get api.gateway_url
 kuaimai-cli config set api.url "https://erp1.superboss.cc/"
+kuaimai-cli config set api.gateway_url "https://open-cli.kuaimai.com"
 kuaimai-cli config set cli.output json
 ```
 
@@ -58,7 +60,7 @@ kuaimai-cli config set cli.output json
 
 - [ ] 再次 `config init` 不覆盖，提示已存在
 - [ ] `config set` 为两参数：`key` `value`（无 `=`）
-- [ ] 模板含 `api.url`、`api.retry`、`cli.output`、`cli.color`、连接池/熔断项
+- [ ] 模板含 `api.url`、`api.gateway_url`、`api.retry`、`cli.output`、`cli.color`、连接池/熔断项
 - [ ] 模板**不含** `json_suffix`（erp1 不追加 `.json`）
 
 **2）鉴权**
@@ -100,29 +102,30 @@ kuaimai-cli api POST /item/stock/queryCount --body '{}' --output json --verbose
 ### 4.1 架构与基建
 
 - [ ] `shortcuts/common/runner` 可用
-- [ ] `meta_data.json` 嵌入，`schema` / `service` 可用
-- [ ] `item` / `scm` 已在 meta 中注册（当前 **v1.7.0**，item **1095** + scm **195** operations）
+- [ ] 远端 registry 可同步：`registry sync` 成功
+- [ ] `capabilities` / `schema` / `web call` 可用
+- [ ] **无** `service` 顶层命令（`kuaimai-cli -h` 中不存在）
 
-### 4.2 元数据与服务命令
+### 4.2 Registry 与 web call
 
 ```bash
-kuaimai-cli schema --output json | jq '.data.version'                    # 期望 1.6.0
-kuaimai-cli schema --output json | jq '.data.version'                  # 期望 1.7.0
-kuaimai-cli schema --output json | jq '.data.operations | length'       # 期望 1290
-kuaimai-cli schema --output json | jq '[.data.operations[] | select(.shortcut != "")] | length'  # 期望 5
-kuaimai-cli service item stock-list --help
-kuaimai-cli service item item-query-list-v2 --help
-kuaimai-cli service item item-save --help
+kuaimai-cli registry sync --output json
+kuaimai-cli capabilities --output json
+kuaimai-cli schema api.luotao.test.get --output json
+kuaimai-cli schema --output json | jq '.data.total'
+kuaimai-cli web call api.luotao.test.get --params '{"keyword":"测试"}' --output json
 ```
 
-- [ ] `service item stock-list` 与 shortcuts `item list` 路径一致（`/item/stock/queryList`）
-- [ ] operation 命名为 `模块-操作` 格式（如 `stock-list`，**非** `list`）
+- [ ] 本地缓存路径 `~/.kuaimai-cli/registry/registry.json` 存在
+- [ ] `schema <apiId>` 输出 `requestSchema` / `contentType` / `write` / `pageable`
+- [ ] `web call` 支持 `--params` / `--data` / `--body`
+- [ ] item/scm 全量 apiId 随 api-onboard 发布逐步增多（过渡期允许仅测试 api）
 - [ ] `contentType` 仅为 `get_query` / `post_form` / `post_json`
 - [ ] 查询接口 `write:false`；写接口 `write:true` 且 `--dry-run` 可预览
 - [ ] 分页列表 `pageable:true`（`stock-list`、`item-query-list-v2` 等）；`--page-all` 可全量翻页
 - [ ] `--page-limit` 达条数上限后停止并 stderr 提示
 - [ ] `--page-confirm no` 在 500 条阈值处静默停止（可用 mock 或大数据环境）
-- [ ] `requestSchema` / `responseSchema` 已写入（对照 [定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md)）
+- [ ] `requestSchema` / `responseSchema` 已写入（对照 [接口 JSON 设计](./接口JSON生成与同步系统设计.md) 与 registry v2 schema）
 
 ### 4.3 企业级能力
 
@@ -138,7 +141,9 @@ kuaimai-cli completion zsh > /dev/null
 ### 4.4 联调环境
 
 - [ ] `api.url` = `https://erp1.superboss.cc/`
+- [ ] `api.gateway_url` = `https://open-cli.kuaimai.com`（或本地 open 服务地址）
 - [ ] `auth login` 使用有效 `accessToken`
+- [ ] dry-run 输出含 `gateway` 与 `target_host` 字段
 
 ---
 
@@ -229,20 +234,21 @@ kuaimai-cli skill install kuaimai-scm
 - [ ] 能列出 `kuaimai-item`、`kuaimai-shared`、`kuaimai-scm`
 - [ ] `skill install` 写入 `~/.agents/skills/<name>/` 整目录（`SKILL.md` + `references/`）
 - [ ] `kuaimai-item/references/` 含 **10** 个工作流文档
-- [ ] `kuaimai-scm/references/` 含 **7** 个工作流文档（domain-routing、meta-execution、service、staff、logging、item-base、dsb）
-- [ ] `kuaimai-item/SKILL.md` 含 CRITICAL 读 shared、Shortcuts 表、API Resources、快速决策
-- [ ] `kuaimai-scm/SKILL.md` 含 scm 路由表、`service scm` 说明、item/scm 分流
+- [ ] `kuaimai-scm/references/` 含 **7** 个工作流文档（含 `kuaimai-scm-web-call.md`）
+- [ ] `kuaimai-item/SKILL.md` 含 CRITICAL 读 shared、Shortcuts 表、意图路由（**无**硬编码 meta 大表）
+- [ ] `kuaimai-shared/SKILL.md` 含 registry 发现流程（capabilities → schema → web call）
+- [ ] `kuaimai-scm/SKILL.md` 含 scm 路由表、`web call` 说明、item/scm 分流
 - [ ] `kuaimai-shared/SKILL.md` 含 `metadata.cliHelp`，路由至 item/scm 域 Skill
 - [ ] `doctor` 检测 item 与 scm 的 `references/` 缺失时提示重装
 
 ### 5.5.1 供应链域（scm）
 
 ```bash
-kuaimai-cli service scm staff-query --body '{"pageNo":1,"pageSize":5}' --output json
-kuaimai-cli service scm logging-publish-log \
+kuaimai-cli web call scm.staff-query --body '{"pageNo":1,"pageSize":5}' --output json
+kuaimai-cli web call scm.logging-publish-log \
   --body '{"pageNo":1,"pageSize":5,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}' \
   --output json
-kuaimai-cli service scm item-base-page --body '{"pageNo":1,"pageSize":5}' --output json
+kuaimai-cli web call scm.item-base-page --body '{"pageNo":1,"pageSize":5}' --output json
 ```
 
 - [ ] 请求发往 `scm.superboss.cc`（非 erp1）
@@ -329,9 +335,21 @@ kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run -
 
 - [ ] dry-run 不发送写请求；正式执行后标题已更新
 
-### 6.4 仍规划
+### 6.4 Registry 中心化（当前主线）
 
-扩展更多 curated shortcuts · `--page-delay` · 单 op `schema`
+```bash
+kuaimai-cli -h | grep -c service    # 期望 0（无 service 命令）
+kuaimai-cli capabilities --output json
+kuaimai-cli schema api.luotao.test.get --output json
+```
+
+- [ ] `service` 命令已移除
+- [ ] Skill v3/v2/v1.1 已安装（`doctor` 通过）
+- [ ] api-onboard 发布新 apiId 后 `web call` 可调
+
+### 6.5 仍规划
+
+全量 item/scm apiId 发布至远端 · `--page-delay` · `--format pretty`
 
 ---
 
@@ -339,7 +357,7 @@ kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run -
 
 1. 阶段一全部通过后再扩展阶段二  
 2. 阶段三以 **item 标题查改** 为业务验收基准  
-3. 新接口：按 [meta_data.json 定义规范](./kuaimai-cli%20meta_data.json%20定义规范.md) 更新 `meta_data.json` + 对应 Skill；item 高频接口另更新 `shortcuts/item` + 本文档  
+3. 新接口：在 api-onboard 发布至 open-cli `registry.json` → `registry sync` 验收 → 更新 Skill references；item 高频可选 `shortcuts/item`  
 
 ---
 

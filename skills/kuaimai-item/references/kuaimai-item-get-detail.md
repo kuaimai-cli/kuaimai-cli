@@ -28,15 +28,15 @@ kuaimai-cli item get-detail \
 - **write**：`false` — 不支持 `--dry-run`
 - **pageable**：`false` — `--page-all` 无效
 
-### 等价 service 调用
+### 等价 web call
 
 ```bash
-kuaimai-cli service item item-detail \
+kuaimai-cli web call item.item-detail \
   --body '{"sysItemId":<sysItemId>}' \
   --output json --no-color
 ```
 
-`sysItemId` 在 requestSchema 中为 **required**；service 层缺参会报错。
+`sysItemId` 在 requestSchema 中为 **required**；`web call` 缺参会报错。
 
 ## 响应解析
 

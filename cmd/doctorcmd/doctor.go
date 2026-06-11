@@ -1,6 +1,7 @@
 package doctorcmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/kuaimai-cli/kuaimai-cli/internal/build"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
+	"github.com/kuaimai-cli/kuaimai-cli/internal/registry"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/skill"
 	"github.com/spf13/cobra"
 )
@@ -37,21 +39,23 @@ func doctorCmd() *cobra.Command {
 			scmSkillOK, _ := skill.IsInstalled("kuaimai-scm")
 			scmRefOK, _ := skill.HasReferences("kuaimai-scm")
 			skillReady := skillOK && refOK && scmSkillOK && scmRefOK
+			_, regVersion, regCount, regOK := registry.CacheInfo()
 
 			checks := []map[string]any{
 				{"name": "config", "ok": configOK, "hint": hintConfig(configOK)},
 				{"name": "auth", "ok": loggedIn, "hint": hintAuth(loggedIn)},
 				{"name": "path", "ok": path != "", "hint": hintPath(path)},
+				{"name": "registry", "ok": regOK, "hint": hintRegistry(regOK, regVersion, regCount)},
 				{"name": "skill_kuaimai_item", "ok": skillOK && refOK, "hint": hintSkill(skillOK, refOK)},
 				{"name": "skill_kuaimai_scm", "ok": scmSkillOK && scmRefOK, "hint": hintScmSkill(scmSkillOK, scmRefOK)},
 			}
-			allOK := configOK && loggedIn && path != "" && skillReady
+			allOK := configOK && loggedIn && path != "" && regOK && skillReady
 
 			return f.Printer().Success(map[string]any{
 				"version": build.Version,
 				"ready":   allOK,
 				"checks":  checks,
-				"next":    nextSteps(configOK, loggedIn, skillReady),
+				"next":    nextSteps(configOK, loggedIn, regOK, skillReady),
 			})
 		},
 	}
@@ -69,6 +73,13 @@ func hintAuth(ok bool) string {
 		return "已登录"
 	}
 	return auth.LoginHint
+}
+
+func hintRegistry(ok bool, version string, count int) string {
+	if ok {
+		return fmt.Sprintf("registry 已同步（version=%s, apis=%d）", version, count)
+	}
+	return "执行 kuaimai-cli registry sync"
 }
 
 func hintPath(p string) string {
@@ -98,10 +109,13 @@ func hintScmSkill(installed, hasRefs bool) string {
 	return "执行 kuaimai-cli skill install kuaimai-scm"
 }
 
-func nextSteps(configOK, loggedIn, skillOK bool) []string {
+func nextSteps(configOK, loggedIn, regOK, skillOK bool) []string {
 	var steps []string
 	if !configOK {
 		steps = append(steps, "kuaimai-cli config init")
+	}
+	if !regOK {
+		steps = append(steps, "kuaimai-cli registry sync")
 	}
 	if !loggedIn {
 		steps = append(steps, auth.LoginHint)
@@ -113,7 +127,7 @@ func nextSteps(configOK, loggedIn, skillOK bool) []string {
 		steps = append(steps, "kuaimai-cli skill install")
 	}
 	if len(steps) == 0 {
-		steps = append(steps, "环境就绪，可使用 item +list / service scm 等命令")
+		steps = append(steps, "环境就绪，可使用 item +list / web call <apiId> 等命令")
 	}
 	return steps
 }

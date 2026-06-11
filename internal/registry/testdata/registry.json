@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "2.0",
+  "version": "2026.06.11.99",
+  "generatedAt": "2026-06-11T12:00:00+08:00",
+  "source": "kuaimai-registry-generator",
+  "domains": {
+    "商品": {
+      "label": "商品",
+      "count": 1,
+      "apiIds": ["api.luotao.test.get"]
+    },
+    "其他": {
+      "label": "其他",
+      "count": 1,
+      "apiIds": ["api.luotao.test.post"]
+    }
+  },
+  "apis": {
+    "api.luotao.test.get": {
+      "id": "api.luotao.test.get",
+      "domain": "商品",
+      "title": "CLI自动化测试 - 查询测试数据",
+      "description": "测试 GET 接口",
+      "transport": "web",
+      "method": "GET",
+      "path": "/api/luotao/test/get",
+      "baseUrl": "",
+      "contentType": "get_query",
+      "risk": "read",
+      "write": false,
+      "pageable": false,
+      "stability": "stable",
+      "auth": { "type": "header", "key": "accessToken" },
+      "requestSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": { "type": "string", "desc": "关键字", "default": "测试商品" }
+        },
+        "required": []
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "suc": { "type": "boolean", "desc": "是否成功" }
+        }
+      },
+      "response": { "successPath": "suc", "listPath": "", "primaryFields": ["sysItemId"] },
+      "source": { "type": "yapi", "business_domain": "商品" },
+      "examples": [{ "title": "示例", "command": "kuaimai web call api.luotao.test.get --params '{}'" }]
+    },
+    "api.luotao.test.post": {
+      "id": "api.luotao.test.post",
+      "domain": "其他",
+      "title": "CLI自动化测试 - 提交测试数据",
+      "description": "测试 POST 接口",
+      "transport": "web",
+      "method": "POST",
+      "path": "/api/luotao/test/post",
+      "baseUrl": "",
+      "contentType": "post_json",
+      "risk": "read",
+      "write": false,
+      "pageable": false,
+      "stability": "stable",
+      "auth": { "type": "header", "key": "accessToken" },
+      "requestSchema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "desc": "标题" }
+        },
+        "required": ["title"]
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "suc": { "type": "boolean", "desc": "是否成功" }
+        }
+      },
+      "response": { "successPath": "suc", "listPath": "", "primaryFields": ["sysItemId"] },
+      "source": { "type": "yapi", "business_domain": "其他" },
+      "examples": [{ "title": "示例", "command": "kuaimai web call api.luotao.test.post --data '{\"title\":\"x\"}'" }]
+    }
+  }
+}

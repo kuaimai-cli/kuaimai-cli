@@ -1,26 +1,21 @@
 package registry
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
 
-//go:embed meta_data.json
-var metaFS embed.FS
-
-// ContentType values for request encoding (see docs/kuaimai-cli meta_data.json 定义规范.md).
+// ContentType values for request encoding.
 const (
 	ContentTypeGetQuery  = "get_query"
 	ContentTypePostForm  = "post_form"
 	ContentTypePostJSON  = "post_json"
 )
 
-// PropertySchema describes one request/response field in meta_data.json.
+// PropertySchema describes one request/response field.
 // Nested objects use properties; arrays use items (see item-list-v2 responseSchema).
 type PropertySchema struct {
 	Type       string                    `json:"type,omitempty"`
@@ -30,7 +25,7 @@ type PropertySchema struct {
 	Items      *JSONSchema               `json:"items,omitempty"`
 }
 
-// JSONSchema is a lightweight schema object stored in meta_data.json.
+// JSONSchema is a lightweight schema object stored in registry.json.
 type JSONSchema struct {
 	Type       string                    `json:"type,omitempty"`
 	Properties map[string]PropertySchema `json:"properties,omitempty"`
@@ -59,29 +54,65 @@ type Service struct {
 	Operations  map[string]Operation `json:"operations"`
 }
 
-// Metadata is the full API registry document.
+// Metadata is the in-memory API registry used by schema/web call commands.
 type Metadata struct {
 	Version     string             `json:"version"`
 	GeneratedAt string             `json:"generated_at,omitempty"`
 	Services    map[string]Service `json:"services"`
 }
 
-// Load reads meta_data.json from disk or falls back to embedded copy.
+// Load reads the synced registry cache (~/.kuaimai-cli/registry/registry.json).
 func Load() (*Metadata, error) {
-	path := MetaDataPath()
-	raw, err := metaFS.ReadFile("meta_data.json")
+	path := CachePath()
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("读取内置 API 元数据失败: %w", err)
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("本地 registry 未同步，请先执行: kuaimai-cli registry sync（默认源 %s）", DefaultRegistrySource)
+		}
+		return nil, fmt.Errorf("读取 registry 缓存失败: %w", err)
 	}
-	if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
-		raw = b
+	return LoadFromRaw(raw)
+}
+
+// LoadFromRaw parses registry v2 JSON bytes into runtime Metadata.
+func LoadFromRaw(raw []byte) (*Metadata, error) {
+	doc, err := parseDocumentV2(raw)
+	if err != nil {
+		return nil, err
 	}
-	var meta Metadata
-	if err := json.Unmarshal(raw, &meta); err != nil {
-		return nil, fmt.Errorf("解析 API 元数据失败: %w", err)
+	return documentV2ToMetadata(doc)
+}
+
+// LoadFromFile loads registry from an explicit file path (tests / tooling).
+func LoadFromFile(path string) (*Metadata, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
-	meta.normalize()
-	return &meta, nil
+	return LoadFromRaw(raw)
+}
+
+// DocumentFromCache returns the raw v2 document from local cache.
+func DocumentFromCache() (*DocumentV2, error) {
+	raw, err := os.ReadFile(CachePath())
+	if err != nil {
+		return nil, err
+	}
+	return parseDocumentV2(raw)
+}
+
+// CacheInfo returns basic local cache metadata for doctor/diagnostics.
+func CacheInfo() (path string, version string, apiCount int, ok bool) {
+	path = CachePath()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return path, "", 0, false
+	}
+	var doc DocumentV2
+	if err := json.Unmarshal(raw, &doc); err != nil || isEmptyDocumentV2(&doc) {
+		return path, "", 0, false
+	}
+	return path, doc.Version, len(doc.APIs), true
 }
 
 func (m *Metadata) normalize() {
@@ -100,12 +131,6 @@ func (m *Metadata) normalize() {
 		}
 		m.Services[svcName] = svc
 	}
-}
-
-// MetaDataPath returns the on-disk metadata file path.
-func MetaDataPath() string {
-	cwd, _ := os.Getwd()
-	return filepath.Join(cwd, "internal", "registry", "meta_data.json")
 }
 
 // ServiceNames returns sorted service keys.

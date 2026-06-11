@@ -12,7 +12,7 @@
 ## queryDistributionConfig
 
 ```bash
-kuaimai-cli service scm dsb-query-distribution-config \
+kuaimai-cli web call scm.dsb-query-distribution-config \
   --body '{"shopType":"TouTiaoFXG"}' \
   --output json --no-color
 ```

@@ -4,7 +4,7 @@
 
 - 用户要在**商品档案**维度搜索/列出商品（非库存 ARCHIVE_V2 页）
 - 需要 V2 独有筛选：`outerId`、`skuOuterId`、`itemType`、`catIds`、`brandNames` 等
-- **无 shortcut**；必须通过 `service item item-query-list-v2`
+- **无 shortcut**；必须通过 `web call item.item-query-list-v2`
 
 与 `item +list`（`stock-list` / 库存页）的区别：
 
@@ -13,7 +13,7 @@
 | meta operation | `stock-list` | `item-query-list-v2` |
 | path | `/item/stock/queryList` | `/item/queryListV2` |
 | 页面场景 | 库存 ARCHIVE_V2 | 商品档案 V2 |
-| shortcut | ✅ `item +list` | ❌ 仅 service |
+| shortcut | ✅ `item +list` | ❌ 仅 web call |
 
 ## 前置检查
 
@@ -24,7 +24,7 @@ kuaimai-cli auth status --output json
 ## 命令
 
 ```bash
-kuaimai-cli service item item-query-list-v2 \
+kuaimai-cli web call item.item-query-list-v2 \
   --body '{"title":"<关键词>","pageNo":1,"pageSize":50}' \
   --output json --no-color
 ```
@@ -32,7 +32,7 @@ kuaimai-cli service item item-query-list-v2 \
 全量翻页（**先评估数据量，见下方防护规则**）：
 
 ```bash
-kuaimai-cli service item item-query-list-v2 \
+kuaimai-cli web call item.item-query-list-v2 \
   --body '{"title":"<关键词>","pageNo":1,"pageSize":50}' \
   --page-all --output json --no-color
 ```
@@ -78,7 +78,7 @@ kuaimai-cli service item item-query-list-v2 \
 
 - 用户只说「搜标题含 XX 的商品」且未指定档案/库存页 → 默认 **`item +list`**（shortcut 更简单）
 - 用户提到档案、商家编码、`itemType`、类目筛选 → 用 **本接口**
-- 统计数量（档案维度）→ **`service item item-query-count`**，见 [`kuaimai-item-query-count.md`](kuaimai-item-query-count.md) 与 [`kuaimai-item-count-dimensions.md`](kuaimai-item-count-dimensions.md)
+- 统计数量（档案维度）→ **`web call item.item-query-count`**，见 [`kuaimai-item-query-count.md`](kuaimai-item-query-count.md) 与 [`kuaimai-item-count-dimensions.md`](kuaimai-item-count-dimensions.md)
 - 统计数量（仅标题、库存页）→ `item count`
 
 ## 禁止

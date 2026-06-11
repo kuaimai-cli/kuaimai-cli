@@ -4,7 +4,7 @@
 
 用户要**改标题 / 改名**，且已知 `sysItemId`（或已通过 `+list` 定位）。
 
-对应 meta operation：`item-update-title`（`post_json`，`write:true`）；shortcuts 层含 get-detail → save **编排**，service 层仅为原子 save。
+对应 apiId `item.item-update-title`（`post_json`，`write:true`）；shortcuts 含 get-detail → save **编排**，`web call` 仅为原子 save。
 
 ## 前置检查
 

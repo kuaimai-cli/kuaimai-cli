@@ -1,16 +1,32 @@
-kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
+# kuaimai-cli 接口元数据定义规范
 
-**适用范围**：erp-items-core 商品域（`item`）、erp-scm 供应链域（`scm`）
+> **重要（2026-06 架构变更）**  
+> - **当前真相源**：远端 [registry.json](http://open-cli.kuaimai.com/registry/registry.json)（`schemaVersion: 2.0`），由 `kuaimaierp-cli-auto` 生成发布  
+> - **CLI 消费**：同步到 `~/.kuaimai-cli/registry/registry.json` → `capabilities` / `schema` / `web call`  
+> - **本文档**：保留 v1 `meta_data.json` **字段语义**对照；新接口登记见 [接口 JSON 生成与同步系统设计](./接口JSON生成与同步系统设计.md)  
+> - **已废弃**：`internal/registry/meta_data.json` 内嵌二进制、`service` 命令
 
-**对标标准**：飞书 lark-cli openapi 规范
+**适用范围**：erp-items-core（item）、erp-scm（scm）接口字段约定
 
-**文件路径**：`internal/registry/meta_data.json`
+**对标标准**：飞书 lark-cli OpenAPI registry
 
-**核心定位**：kuaimai-cli 底层原子接口注册表，CLI 执行、参数校验、schema 自省、全量分页拉取的唯一数据来源
+### v1 → v2 字段对照（维护者）
+
+| v1 `meta_data.json` | v2 `registry.json` |
+|---------------------|----------------------|
+| `services.<domain>.operations.<op>` | `apis["<domain>.<op>"]`（**apiId**） |
+| `operation` 名（如 `stock-list`） | apiId 后缀（`item.stock-list`） |
+| `path` / `method` / `contentType` | 同名，挂在 api 对象上 |
+| `write` / `pageable` | 同名 |
+| `requestSchema` / `responseSchema` | 同名 |
+| `baseUrl`（scm 域） | `baseUrl` 或 registry 全局 `defaults` |
+| `version`（如 1.7.0） | `schemaVersion: "2.0"` + 发布元信息 |
+
+新接口登记与发布流程见 [接口 JSON 生成与同步系统设计](./接口JSON生成与同步系统设计.md)；CLI 消费见 [Registry远端同步说明](./Registry远端同步说明.md)。
 
 ---
 
-## 一、整体文件结构
+## 一、整体文件结构（v1 历史格式，只读对照）
 
 ### 通用模板
 
@@ -52,9 +68,9 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 ## 二、基础接口字段定义规则
 
-### 1. service 名称
+### 1. 业务域（v1 字段名 `service`）
 
-| service | 后端工程 | API 根地址 |
+| 域（v1 `service`） | 后端工程 | API 根地址 |
 |---------|----------|------------|
 | `item`  | erp-items-core | config `api.url`（默认 erp1.superboss.cc） |
 | `scm`   | erp-scm        | meta `baseUrl`（`https://scm.superboss.cc/`） |
@@ -164,20 +180,20 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 作用：定义接口返回数据结构，用于结果解析、字段展示
 
-### 3. 关键答疑：meta 已包含 Schema，为何还要单独 Schema 查询能力？
+### 3. 关键答疑：registry 已包含 Schema，为何还要单独 Schema 查询能力？
 
-- **meta_data.json**：**存储层**，永久存放所有接口的入参、出参结构、接口元信息，是唯一数据源
-- **schema 命令**：**展示/自省层**，执行 `kuaimai-cli schema` 时，从 meta_data.json 中读取 schema 结构并格式化展示
+- **远端 registry.json**：**存储层**（真相源），由 api-onboard 发布；CLI 同步到 `~/.kuaimai-cli/registry/registry.json`
+- **schema 命令**：**展示/自省层**，从本地缓存读取 `requestSchema` / `responseSchema` 并格式化展示
 
-**一句话总结**：meta 存数据，schema 查数据、看数据。
+**一句话总结**：registry 存数据，schema 查数据、看数据。
 
 ### 4. CLI 完整执行链路（核心业务流程）
 
-1. 程序启动：加载`meta_data.json` 全量接口配置并缓存
-2. 用户执行 service 命令：匹配对应 operation 接口
-3. 读取 meta 中 path / method / contentType / write / pageable 规则
+1. 命令前：`registry.SyncIfNeeded` 从 `registry.source` 拉取并缓存
+2. 用户执行 `web call <apiId>`：按 apiId 查找 `apis` 条目
+3. 读取 path / method / contentType / write / pageable 规则
 4. 读取 requestSchema 校验入参合法性
-5. 根据 contentType 自动组装 GET/表单/JSON 请求体
+5. 根据 contentType 自动组装 GET/表单/JSON 请求体（`--params` / `--data` / `--body`）
 6. 若开启 `--page-all` 且 pageable=true，经 `internal/pagination` 全量翻页（含阈值与 `--page-limit`）
 7. 请求后端接口，根据 responseSchema 解析返回结果
 
@@ -185,7 +201,7 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 
 ## 四、最终规范示例（单接口最简可直接使用）
 
-文件路径：`@kuaimai-cli/internal/registry/meta_data.json`
+文件路径（**已废弃，仅对照**）：`internal/registry/meta_data.json`
 
 ```json
 {
@@ -273,13 +289,13 @@ kuaimai-cli meta_data.json 定义规范（V1.0 最终定稿）
 | 当前版本 | **v1.7.0**；`generated_at` 可选（当前 2026-06-08） |
 | 登记范围 | `item` **1095** 个 operation（erp-items-core）；`scm` **195** 个 operation（erp-scm staff/logging/item/dsb） |
 | scm 生成 | `python3 scripts/generate_meta/generate_scm_meta.py` → 自动调用 `normalize_scm_meta.py` |
-| scm baseUrl | `service scm` 使用 meta `baseUrl`，**不**读 config `api.url` |
-| operation 命名 | meta + `service` 使用 `stock-list` 等；**shortcuts** 仍为 `item +list` / `get-detail` 等（见 `schema` 输出 `shortcut` 字段） |
+| scm baseUrl | `web call` 使用 meta `baseUrl`，**不**读 config `api.url` |
+| apiId 命名 | registry 使用 `item.stock-list` 等 apiId；**shortcuts** 仍为 `item +list` / `get-detail` 等（见 `schema` 输出 `shortcut` 字段） |
 | `write` | **业务读写**：查询 `false`，写接口 `true`；`--dry-run` 仅对 `write:true` 生效 |
 | `pageable` | 仅 `pageable:true` 且用户传 `--page-all` 时全量翻页；item **60** + scm **41** 个为 true |
 | 分页防护 | `--page-limit` · `--page-confirm`（500/1000 阈值）；硬上限 1000 页 |
-| Schema | `requestSchema` / `responseSchema` 已写入 meta；`service` 做 **required 轻校验**；`schema` 命令输出完整结构 |
-| 双轨 | item：Agent **优先 shortcuts** + `service item` 兜底；scm：**仅** `service scm`（无 shortcuts） |
+| Schema | `requestSchema` / `responseSchema` 已写入 meta；`web call` 做 **required 轻校验**；`schema` 命令输出完整结构 |
+| 双轨 | item：Agent **优先 shortcuts** + `web call` 兜底；scm：**仅** `web call`（无 shortcuts） |
 
 `operation` 命名：`模块-路径` 小写短横线；CLI **核心 6 个**（5 shortcut + 1 service-only）：`stock-list`、`stock-count`、`item-query-list-v2`、`item-detail`、`item-save`、`item-update-title`。请求 Schema 优先 erp-items-core 入参类，缺失从 erp-core 补；保存商品为 `SysItemModel`。
 
@@ -292,14 +308,14 @@ python3 scripts/filter_meta/filter_by_item_controller.py
 python3 scripts/normalize_meta/normalize_meta.py   # 若存在
 ```
 
-`service` 示例：
+`web call` 示例：
 
 ```bash
-kuaimai-cli service item stock-list --body '{"title":"test","pageNo":1,"pageSize":50}'
-kuaimai-cli service item item-query-list-v2 --body '{"title":"test","pageNo":1,"pageSize":50}'
-kuaimai-cli service item item-detail --body '{"sysItemId":123}'
-kuaimai-cli service scm staff-query --body '{"pageNo":1,"pageSize":20}'
-kuaimai-cli service scm logging-publish-log \
+kuaimai-cli web call item.stock-list --body '{"title":"test","pageNo":1,"pageSize":50}'
+kuaimai-cli web call item.item-query-list-v2 --body '{"title":"test","pageNo":1,"pageSize":50}'
+kuaimai-cli web call item.item-detail --body '{"sysItemId":123}'
+kuaimai-cli web call scm.staff-query --body '{"pageNo":1,"pageSize":20}'
+kuaimai-cli web call scm.logging-publish-log \
   --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}'
 kuaimai-cli schema --output json
 kuaimai-cli item +list --body '{"title":"test"}' --page-all --page-limit 200 --page-confirm yes

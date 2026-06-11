@@ -1,17 +1,20 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/api"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/authcmd"
+	"github.com/kuaimai-cli/kuaimai-cli/cmd/capabilitiescmd"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/completion"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/configcmd"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/doctorcmd"
+	"github.com/kuaimai-cli/kuaimai-cli/cmd/registrycmd"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/schemacmd"
-	"github.com/kuaimai-cli/kuaimai-cli/cmd/servicecmd"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/skillcmd"
 	"github.com/kuaimai-cli/kuaimai-cli/cmd/upgradecmd"
+	"github.com/kuaimai-cli/kuaimai-cli/cmd/webcmd"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/build"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/core"
@@ -69,6 +72,10 @@ var rootCmd = &cobra.Command{
 
 // Execute runs the root command.
 func Execute() error {
+	if err := bootstrapRegistry(os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return err
+	}
 	return rootCmd.Execute()
 }
 
@@ -97,7 +104,9 @@ func init() {
 	authcmd.Register(rootCmd)
 	api.Register(rootCmd)
 	schemacmd.Register(rootCmd)
-	servicecmd.Register(rootCmd)
+	capabilitiescmd.Register(rootCmd)
+	webcmd.Register(rootCmd)
+	registrycmd.Register(rootCmd)
 	item.Register(rootCmd)
 	skillcmd.Register(rootCmd)
 	completion.Register(rootCmd)
