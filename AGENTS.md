@@ -7,8 +7,8 @@
 | 层级 | 模块 | Agent 动作 |
 |------|------|------------|
 | Registry | 远端 `registry.json`（自动同步到本地） | 发现接口：`capabilities` → `schema <apiId>` → `web call <apiId>`（详见 `kuaimai-shared`） |
-| Skill | `kuaimai-shared` + 域 Skill + `references/` | 先 Read `kuaimai-shared`；商品/供应链意图路由读域 Skill；**不在 Skill 维护接口表** |
-| CLI | shortcuts → web call → api | item 有 shortcut 优先；其余走 registry `web call`；**业务 HTTP 经 open-cli 网关转发** |
+| Skill | `kuaimai-shared` + 域 Skill | 先 Read `kuaimai-shared`；商品/供应链读域 Skill 后走 registry 发现；**不在 Skill 维护接口表** |
+| CLI | web call → api | 统一 `capabilities` → `schema` → `web call`；**业务 HTTP 经 open-cli 网关转发** |
 
 ## API 网关
 
@@ -37,33 +37,25 @@ kuaimai-cli → POST open-cli.kuaimai.com/api/forward → erp1 / scm
 
 ## 商品域（item）
 
-优先使用 shortcuts，勿手写 URL：
+统一经 registry 发现后 `web call`（详见 `skills/kuaimai-item/SKILL.md`）：
 
 ```bash
-kuaimai-cli item +list --body '{"title":"关键字","pageNo":1,"pageSize":50}' --output json
-kuaimai-cli item count --body '{"title":"关键字"}' --output json
-kuaimai-cli item get-detail --sys-item-id <id>
-kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run
+kuaimai-cli capabilities --output json
+kuaimai-cli schema <apiId> --output json
+kuaimai-cli web call <apiId> --body '{"title":"关键字","pageNo":1,"pageSize":50}' --output json
 ```
 
 - 域名：`api.url` 默认 `https://erp1.superboss.cc/`（作为 `targetHost`，实际 HTTP 经 `api.gateway_url`）
-- 详见 `skills/kuaimai-item/SKILL.md`
 
 ## 供应链域（scm）
 
-**无 shortcuts**，统一走 registry `web call`（apiId 形如 `scm.<operation>`，自动请求 `https://scm.superboss.cc/`）：
+统一经 registry 发现后 `web call`（详见 `skills/kuaimai-scm/SKILL.md`）：
 
 ```bash
-kuaimai-cli web call scm.staff-query --body '{"pageNo":1,"pageSize":20}' --output json
-kuaimai-cli web call scm.logging-publish-log \
-  --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}' --output json
-kuaimai-cli web call scm.item-base-page --body '{"pageNo":1,"pageSize":50}' --output json
-kuaimai-cli web call scm.dsb-query-distribution-config --params '{"shopType":"TouTiaoFXG"}' --output json
+kuaimai-cli capabilities --output json
+kuaimai-cli schema scm.<operation> --output json
+kuaimai-cli web call scm.<operation> --body '{"pageNo":1,"pageSize":20}' --output json
 ```
-
-- **勿与 item 混用**：路径同为 `/item/*` 时，`web call item.*`（erp1）与 `web call scm.item-*`（scm）语义不同
-- 铺货/操作日志多数需 `startTime`/`endTime`
-- 详见 `skills/kuaimai-scm/SKILL.md` 与 `references/kuaimai-scm-domain-routing.md`
 
 ## Registry（远端接口，对标飞书 CLI）
 
@@ -100,14 +92,14 @@ kuaimai-cli skill install kuaimai-scm
 
 **Agent 路由口诀**：
 
-- 供应链 / scm / 铺货 / 操作日志 → Read `kuaimai-scm/SKILL.md` → `web call scm.<operation>`
-- ERP 库存商品 / 改标题 → Read `kuaimai-item/SKILL.md` → item shortcuts 优先
+- 供应链 / scm / 铺货 / 操作日志 → Read `kuaimai-scm/SKILL.md` → `capabilities` → `schema` → `web call`
+- ERP 商品 / 库存 / 改标题 → Read `kuaimai-item/SKILL.md` → `capabilities` → `schema` → `web call`
 - 配置 / 登录 / 输出 → Read `kuaimai-shared/SKILL.md`
 
 **CRITICAL**：
 
 1. 开始前 Read `kuaimai-shared/SKILL.md`
-2. 写操作须先 Read 对应 `references/` 文档
+2. 商品 / scm 域：Read 对应 Skill 后走 registry 发现，写操作先 `--dry-run --verbose`
 3. 命令选型见 [Agent命令选型与schema流程.md](./docs/Agent命令选型与schema流程.md)
 
 ## 安全

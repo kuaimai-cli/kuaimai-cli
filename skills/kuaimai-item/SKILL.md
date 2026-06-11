@@ -1,105 +1,83 @@
 ---
 name: kuaimai-item
-version: 3.0.0
-description: "快麦 ERP 商品（erp-items-core）：按标题搜索列表、统计数量、查详情、改标题。用户提到商品、SKU、标题、货号、列表、有多少、详情、改名时使用。"
+version: 4.0.0
+description: "快麦 ERP 商品域：库存、档案、标题、SKU、列表、详情、修改。用户提到商品、货号、sysItemId、品牌、类目时使用。接口一律经 registry 发现，不维护本地接口表。"
 metadata:
   requires:
     bins: ["kuaimai-cli"]
-  cliHelp: "kuaimai-cli item --help"
+  cliHelp: "kuaimai-cli capabilities --output json"
 ---
 
-# item（erp-items-core）
+# item（商品域 · erp1）
 
-**CRITICAL — 开始前 MUST Read [`../kuaimai-shared/SKILL.md`](../kuaimai-shared/SKILL.md)**（auth、registry 发现、输出与安全）
+**CRITICAL — 开始前 MUST Read [`../kuaimai-shared/SKILL.md`](../kuaimai-shared/SKILL.md)**
 
-本 Skill 只管 **商品域意图路由与 shortcuts 工作流**。接口参数以 `schema <apiId>` 为准，不在此重复维护接口表。
+本 Skill 只做 **商品域意图识别** 与 **registry 发现调用**。  
+**禁止**凭记忆或文档里的 apiId 表调用；参数以 `schema <apiId>` 为准。
 
-## 意图路由
+## 何时读本 Skill
 
-**库存页 vs 商品档案**：必读 [`references/kuaimai-item-count-dimensions.md`](references/kuaimai-item-count-dimensions.md)。
+用户意图涉及：商品、SKU、标题、货号、outerId、sysItemId、库存列表、商品详情、改名、品牌、类目、档案……
 
-| 用户意图 | 优先命令 | 说明 |
-|----------|----------|------|
-| 有多少 + **标题**（库存页） | `item count` | 禁止用 `+list` 人工数 |
-| 有多少 + **品牌/类目/档案** | `web call item.item-query-count` | 禁止 `item count` |
-| 列出 / 搜索 + **标题**（库存页） | `item +list` | 有 ARCHIVE_V2 默认 body |
-| 列出 / 搜索（档案 V2） | `web call item.item-query-list-v2` | 无 shortcut |
-| 查详情（有 sysItemId） | `item get-detail` | |
-| 改标题 | `item update-title` | 先 `--dry-run`；禁止用原子 save 代替 |
-| 其它 registry 接口 | `schema <apiId>` → `web call` | 见 shared Registry 流程 |
+供应链 / 铺货 / 分销商品 → [`kuaimai-scm`](../kuaimai-scm/SKILL.md)
 
-只有标题没有 ID：先 `+list` 或档案列表取 `sysItemId`，再 `get-detail` / `update-title`。
+## 标准流程（每步 MUST 执行）
 
-## Shortcuts（永远优先）
+```bash
+# 1. 发现：按 domain=商品 或 title/description 关键词筛选
+kuaimai-cli capabilities --output json
 
-| Shortcut | 说明 |
-|----------|------|
-| [`+list`](references/kuaimai-item-list.md) | 库存列表（`title` 筛选、`--page-all`） |
-| [`count`](references/kuaimai-item-count.md) | 按标题统计（库存页） |
-| [`get-detail`](references/kuaimai-item-get-detail.md) | 按 `sysItemId` 查详情 |
-| [`update-title`](references/kuaimai-item-update-title.md) | 改标题（get-detail → save 编排） |
-| [`save`](references/kuaimai-item-save.md) | 全量 body 保存（复杂字段修改） |
+# 2. 自省：requestSchema / pageable / write / examples / contentType
+kuaimai-cli schema <apiId> --output json
 
-**无 shortcut 的常用 web call**（参数见 `schema`）：
+# 3. 调用（经 open-cli 网关）
+kuaimai-cli web call <apiId> --params '{"k":"v"}'    # get_query
+kuaimai-cli web call <apiId> --data '{"k":"v"}'     # post_json / post_form
+kuaimai-cli web call <apiId> --body '{"k":"v"}'     # 按 contentType 自动路由
+```
 
-| apiId | 说明 | reference |
-|-------|------|-----------|
-| `item.item-query-count` | 商品档案统计 | [`kuaimai-item-query-count.md`](references/kuaimai-item-query-count.md) |
-| `item.item-query-list-v2` | 商品档案列表 V2 | [`kuaimai-item-query-list-v2.md`](references/kuaimai-item-query-list-v2.md) |
-
-**CRITICAL — 写操作（`save`、`update-title`）前 MUST Read 对应 references**
-
-## 前置条件
-
-| 场景 | 要求 |
+| 步骤 | 规则 |
 |------|------|
-| 改标题 / save | Read 对应 reference；先 `--dry-run --verbose` |
-| 翻页全量 | 先 `count` 评估；见 [`kuaimai-item-meta-execution.md`](references/kuaimai-item-meta-execution.md) |
-| 调用未知 apiId | `kuaimai-cli schema <apiId>`，不要猜字段 |
+| 选 apiId | 只从 `capabilities` 返回的 apis 中选；读 `title`、`description`、`domain` |
+| 填参数 | 只按 `schema` 的 `requestSchema`；可参考 `examples` |
+| 写操作 | `write:true` 时先 `--dry-run --verbose`，用户确认后再提交 |
+| 翻页 | 仅 `pageable:true` 可用 `--page-all`；全量前先评估数据量 |
+| 找不到 | `registry sync` → 重跑 `capabilities`；仍无则接口未发布 |
 
-## 端到端：按标题改标题
+## 域分流（CRITICAL）
+
+路径前缀同为 `/item/`，但 **erp1 与 scm 是不同后端**：
+
+| 用户描述 | 读本 Skill | 后端 |
+|----------|-----------|------|
+| ERP 库存、档案、改标题、sysItemId | ✅ item | erp1（`api.url`） |
+| 供应链、铺货、分销商品 | ❌ → scm | scm.superboss.cc |
+
+不确定时 Read [`../kuaimai-scm/references/kuaimai-scm-domain-routing.md`](../kuaimai-scm/references/kuaimai-scm-domain-routing.md)
+
+## 意图 → 发现策略（非接口表）
+
+用 `capabilities` + `schema` 匹配，**不要硬编码 apiId**：
+
+| 用户意图 | 在 capabilities/schema 中找 |
+|----------|------------------------------|
+| 列表 / 搜索 | title 或 description 含 list、query、stock、列表 |
+| 统计 / 有多少 | 含 count、统计 |
+| 详情 | 含 detail、get、详情 |
+| 新建 / 修改 / 保存 | `write:true`，含 save、update、修改 |
+
+只有标题没有 ID：先调列表类 apiId 取 `sysItemId`，再调详情 / 写接口。
+
+## 典型流程：按标题定位再修改
 
 | 步骤 | 操作 |
 |------|------|
-| 1 | `item +list` 按标题搜索 → 取 `sysItemId`（多条让用户选） |
-| 2 | `item update-title --dry-run --verbose` 预览 |
-| 3 | 用户确认后去掉 `--dry-run` |
+| 1 | `capabilities` → 选列表 apiId → `schema` → `web call` 按标题搜索 |
+| 2 | 从 `data` 取 `sysItemId`（多条则让用户选） |
+| 3 | `capabilities` → 选写 apiId → `schema` → `web call --dry-run --verbose` |
+| 4 | 用户确认后去掉 `--dry-run` |
 
-## web call 与 shortcuts 差异
+## 不在本 Skill 范围
 
-| 能力 | shortcuts | `web call item.*` |
-|------|-----------|-------------------|
-| 默认 ARCHIVE_V2 body | `+list` ✅ | 需自传或看 schema default |
-| `update-title` 编排 | ✅ get-detail → save | ❌ 仅原子 save |
-| `--dry-run` 查询 | ❌ | ❌ |
-| `--dry-run` 写操作 | ✅ | ✅ |
-
-详见 [`kuaimai-item-web-call.md`](references/kuaimai-item-web-call.md)。
-
-## 快速决策
-
-- 库存页标题统计 → **`item count`**，不是 `+list`
-- 档案维度统计 → **`web call item.item-query-count`**
-- 只改标题 → **`update-title`**，不是 `save` / `web call item.item-update-title`
-- 列表多条且下一步有副作用 → 列候选让用户选
-- 失败优先转述 `hint`
-
-## 典型场景
-
-```bash
-kuaimai-cli item count --body '{"title":"春季"}' --output json --no-color
-
-kuaimai-cli item +list --body '{"title":"test","pageNo":1,"pageSize":50}' --output json --no-color
-
-kuaimai-cli web call item.item-query-count \
-  --body '{"brandNames":"洛可可","pageNo":1,"pageSize":1}' --output json --no-color
-
-kuaimai-cli item update-title --sys-item-id <id> --title "新名称" \
-  --dry-run --verbose --output json --no-color
-```
-
-## 不在本 skill 范围
-
-- 配置、登录、registry 同步 → [`kuaimai-shared`](../kuaimai-shared/SKILL.md)
-- 供应链 / 铺货 / scm 商品 → [`kuaimai-scm`](../kuaimai-scm/SKILL.md)
-- 发现其它 apiId → `capabilities` / `schema`（shared）
+- 配置、登录、registry 机制 → [`kuaimai-shared`](../kuaimai-shared/SKILL.md)
+- 供应链 / 铺货 / 操作日志 → [`kuaimai-scm`](../kuaimai-scm/SKILL.md)
