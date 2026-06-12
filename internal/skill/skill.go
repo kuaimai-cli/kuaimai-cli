@@ -23,7 +23,11 @@ const (
 func DefaultGitHubRepo() string { return defaultGitHubRepo }
 
 // DefaultSkillNames are bundled skills in the GitHub repo skills/ directory.
-var DefaultSkillNames = []string{"kuaimai-shared", "kuaimai-item", "kuaimai-scm"}
+var DefaultSkillNames = []string{"kuaimai-shared", "kuaimai-erp-item", "kuaimai-scm-item"}
+
+// LegacyDefaultSkillNames are old default skill directories that should be
+// removed when refreshing defaults, so agents do not read stale routing rules.
+var LegacyDefaultSkillNames = []string{"kuaimai-item", "kuaimai-scm"}
 
 // Entry describes an installed SKILL.md.
 type Entry struct {
@@ -37,6 +41,15 @@ type Entry struct {
 type InstallResult struct {
 	Name  string   `json:"name"`
 	Paths []string `json:"paths"`
+}
+
+// RootStatus describes whether one agent skill root has all default skills.
+type RootStatus struct {
+	Root    string          `json:"root"`
+	OK      bool            `json:"ok"`
+	Skills  map[string]bool `json:"skills"`
+	Refs    map[string]bool `json:"references"`
+	Missing []string        `json:"missing,omitempty"`
 }
 
 // InstallOptions configures skill install (bundled npm/repo skills first, GitHub fallback).
@@ -172,6 +185,68 @@ func HasReferences(name string) (bool, error) {
 	return false, nil
 }
 
+// DefaultRootStatuses reports default skill readiness for every supported agent root.
+func DefaultRootStatuses() ([]RootStatus, error) {
+	return RootStatuses(DefaultSkillNames)
+}
+
+// RootStatuses reports skill and references readiness for every supported agent root.
+func RootStatuses(names []string) ([]RootStatus, error) {
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		return nil, err
+	}
+	var out []RootStatus
+	for _, root := range roots {
+		st := RootStatus{
+			Root:   root,
+			OK:     true,
+			Skills: make(map[string]bool, len(names)),
+			Refs:   make(map[string]bool, len(names)),
+		}
+		for _, name := range names {
+			skillOK := fileExists(filepath.Join(root, name, "SKILL.md"))
+			refOK := dirExists(filepath.Join(root, name, "references"))
+			st.Skills[name] = skillOK
+			st.Refs[name] = refOK
+			if !skillOK {
+				st.OK = false
+				st.Missing = append(st.Missing, name+"/SKILL.md")
+			}
+			if !refOK {
+				st.OK = false
+				st.Missing = append(st.Missing, name+"/references")
+			}
+		}
+		out = append(out, st)
+	}
+	return out, nil
+}
+
+// DefaultsInstalledInAllRoots reports whether each supported agent root has every default skill.
+func DefaultsInstalledInAllRoots() (bool, error) {
+	statuses, err := DefaultRootStatuses()
+	if err != nil {
+		return false, err
+	}
+	for _, st := range statuses {
+		if !st.OK {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
 // Install installs the full skill directory into all agent skill roots.
 // Prefers bundled skills shipped with the npm package or repo; falls back to GitHub.
 func Install(name string, opts InstallOptions) (InstallResult, error) {
@@ -216,6 +291,9 @@ func Install(name string, opts InstallOptions) (InstallResult, error) {
 
 // InstallDefaults installs DefaultSkillNames (bundled first, GitHub fallback).
 func InstallDefaults(opts InstallOptions) ([]InstallResult, error) {
+	if err := RemoveDefaultSkillDirs(); err != nil {
+		return nil, err
+	}
 	var out []InstallResult
 	for _, name := range DefaultSkillNames {
 		res, err := Install(name, opts)
@@ -225,6 +303,25 @@ func InstallDefaults(opts InstallOptions) ([]InstallResult, error) {
 		out = append(out, res)
 	}
 	return out, nil
+}
+
+// RemoveDefaultSkillDirs deletes current and legacy default skill dirs from all
+// agent roots before a default refresh. Non-kuaimai user skills are untouched.
+func RemoveDefaultSkillDirs() error {
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		return err
+	}
+	names := append([]string{}, DefaultSkillNames...)
+	names = append(names, LegacyDefaultSkillNames...)
+	for _, root := range roots {
+		for _, name := range names {
+			if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
+				return fmt.Errorf("删除旧 Skill %s 失败: %w", name, err)
+			}
+		}
+	}
+	return nil
 }
 
 func fetchSkillTreeFromGitHub(name, repo, ref string) ([]skillFile, error) {

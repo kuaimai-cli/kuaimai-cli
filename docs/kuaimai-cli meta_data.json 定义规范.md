@@ -290,7 +290,7 @@
 | 登记范围 | `item` **1095** 个 operation（erp-items-core）；`scm` **195** 个 operation（erp-scm staff/logging/item/dsb） |
 | scm 生成 | `python3 scripts/generate_meta/generate_scm_meta.py` → 自动调用 `normalize_scm_meta.py` |
 | scm baseUrl | `web call` 使用 meta `baseUrl`，**不**读 config `api.url` |
-| apiId 命名 | registry 使用 `item.stock-list` 等 apiId；**shortcuts** 仍为 `item +list` / `get-detail` 等（见 `schema` 输出 `shortcut` 字段） |
+| apiId 命名 | registry 使用 `item.stock-list` 等 apiId；**shortcuts** 仍为 `erp-item +list` / `get-detail` 等（见 `schema` 输出 `shortcut` 字段） |
 | `write` | **业务读写**：查询 `false`，写接口 `true`；`--dry-run` 仅对 `write:true` 生效 |
 | `pageable` | 仅 `pageable:true` 且用户传 `--page-all` 时全量翻页；item **60** + scm **41** 个为 true |
 | 分页防护 | `--page-limit` · `--page-confirm`（500/1000 阈值）；硬上限 1000 页 |
@@ -318,5 +318,5 @@ kuaimai-cli web call scm.staff-query --body '{"pageNo":1,"pageSize":20}'
 kuaimai-cli web call scm.logging-publish-log \
   --body '{"pageNo":1,"pageSize":20,"startTime":"2026-06-01 00:00:00","endTime":"2026-06-08 23:59:59"}'
 kuaimai-cli schema --output json
-kuaimai-cli item +list --body '{"title":"test"}' --page-all --page-limit 200 --page-confirm yes
+kuaimai-cli erp-item +list --body '{"title":"test"}' --page-all --page-limit 200 --page-confirm yes
 ```

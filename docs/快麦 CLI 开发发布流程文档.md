@@ -1,10 +1,59 @@
 # 快麦 CLI 开发发布流程
 
-全部命令无占位、可直接复制运行。开发 / 推送 / PR / 发版 / 用户安装全流程闭环。
+本文面向第一次发布的人，按“本地检查 → 提交 main → 打 tag → GitHub Actions 发布 → 用户升级验证”的顺序执行。
+
+核心规则：
+
+- **推送 main 只触发 CI，不发布新版。**
+- **推送 `v*` tag 才触发 GitHub Release 与 npm 发布。**
+- **npm 包版本由 release workflow 自动从 tag 写入，不需要手动改 `npm/package.json`。**
+- **默认 Skills 安装/自动同步会删除旧默认 Skill，再安装当前默认 Skill。**
 
 ---
 
-## 一、本地开发编译 & 自测
+## 一、新手发版最短路径
+
+以下流程用于功能已开发完成、准备发布一个正式版本时执行。
+
+```bash
+cd /Users/admin/Documents/project/kuaimai-cli
+
+# 1. 同步 skills 到 npm 包
+node npm/scripts/sync-skills.js
+
+# 2. 编译
+go build ./...
+
+# 3. 跑不依赖本地监听端口的关键测试
+go test ./shortcuts/erp-item ./shortcuts/scm-item ./cmd/...
+go test ./internal/skill -run TestInstallDefaultsRemovesLegacyDefaultSkills
+node --test npm/scripts/install-skills.test.js
+
+# 4. 检查命令是否存在
+go run . erp-item --help
+go run . scm-item --help
+
+# 5. 整理提交
+git status
+git add -A
+git commit -m "feat: add scm item publishing shortcuts"
+git push origin main
+
+# 6. 发布新版本：先确认最新 tag，再打下一个版本号
+git tag --list 'v*' --sort=-v:refname | head
+git tag v0.2.5
+git push origin v0.2.5
+
+# 7. 查看发布流水线和 npm 版本
+gh run list --repo kuaimai-cli/kuaimai-cli --workflow=release.yml --limit 3
+npm view @kuaimai-cli/cli version
+```
+
+本地 `go test ./...` 也应该在 CI 中通过；如果本地沙箱禁止 `httptest` 监听端口，可能出现 `failed to listen on a port`，此时以 GitHub Actions CI 为准。
+
+---
+
+## 二、本地开发编译 & 自测
 
 ```bash
 cd /Users/admin/Documents/project/kuaimai-cli
@@ -17,7 +66,7 @@ go build -mod=vendor -o kuaimai-cli .
 
 # 3. 编译校验
 ./kuaimai-cli --version
-./kuaimai-cli -h                    # 确认无 service 命令；含 capabilities/web/registry
+./kuaimai-cli -h
 ./kuaimai-cli doctor --output json
 
 # 4. 单元测试 + E2E
@@ -37,8 +86,8 @@ node npm/scripts/sync-skills.js
 
 ```bash
 ./kuaimai-cli auth check --output json
-./kuaimai-cli item +list --body '{"title":"测试","pageNo":1,"pageSize":1}' --output json
-./kuaimai-cli item update-title --sys-item-id 10001 --title "测试更新" --dry-run --verbose
+./kuaimai-cli erp-item +list --body '{"title":"测试","pageNo":1,"pageSize":1}' --output json
+./kuaimai-cli erp-item update-title --sys-item-id 10001 --title "测试更新" --dry-run --verbose
 ./kuaimai-cli web call api.luotao.test.get --params '{"keyword":"测试"}' --output json
 ```
 
@@ -51,7 +100,7 @@ node npm/scripts/sync-skills.js
 
 ---
 
-## 二、完整分支开发流程
+## 三、完整分支开发流程
 
 分支示例：`dev-test`
 
@@ -79,7 +128,7 @@ git push origin --delete dev-test
 
 ---
 
-## 三、代码直接推送 main
+## 四、代码直接推送 main
 
 ```bash
 cd /Users/admin/Documents/project/kuaimai-cli
@@ -121,7 +170,7 @@ EOF
 
 ---
 
-## 四、发版 → 用户可用（必走）
+## 五、发版 → 用户可用（必走）
 
 **关键**：仅推送 main，用户无法获取新版；必须打 Tag 触发 `release.yml` 发布 NPM。
 
@@ -129,10 +178,11 @@ EOF
 cd /Users/admin/Documents/project/kuaimai-cli
 git checkout main && git pull origin main
 
-# 查线上版本，递增打 Tag
+# 查线上版本和已有 Tag，递增打 Tag
 npm view @kuaimai-cli/cli version
-git tag v0.1.X
-git push origin v0.1.X
+git tag --list 'v*' --sort=-v:refname | head
+git tag v下一版本号
+git push origin v下一版本号
 
 # 等待 1～3 分钟后校验
 npm view @kuaimai-cli/cli version
@@ -146,6 +196,34 @@ gh run list --repo kuaimai-cli/kuaimai-cli --workflow=release.yml --limit 3
 - [ ] `CHANGELOG.md` 已更新
 - [ ] Tag 版本号高于 npm 线上版本
 
+### npm 版本号规则
+
+`release.yml` 会在 `npm-publish` job 中自动把 tag 写入 `npm/package.json`：
+
+```bash
+VERSION="${GITHUB_REF_NAME#v}"
+pkg.version = VERSION
+```
+
+因此正常发版时 **不需要手动修改 `npm/package.json` 的 version**；以 tag 为准，例如推送 `v0.2.5` 时，npm 发布包版本会自动变成 `0.2.5`。  
+只有手动在本地执行 `npm publish` 时，才需要先手动同步 `npm/package.json` 版本。正常发布必须走 `git push origin v下一版本号`，不要直接在本地 `npm publish`。
+
+### Skill 重装规则
+
+默认 Skill 安装/自动同步会先删除旧默认 Skill 目录，再安装当前默认 Skills：
+
+```text
+删除：kuaimai-shared、kuaimai-erp-item、kuaimai-scm-item、kuaimai-item、kuaimai-scm
+安装：kuaimai-shared、kuaimai-erp-item、kuaimai-scm-item
+```
+
+这可以避免旧版本用户升级后，Agent 继续读取历史 `kuaimai-item` / `kuaimai-scm` 路由。用户升级后建议执行：
+
+```bash
+kuaimai-cli skill install --force
+kuaimai-cli doctor --output json
+```
+
 用户更新：
 
 ```bash
@@ -156,15 +234,16 @@ kuaimai-cli skill install --force
 ### 发版失败重置 Tag
 
 ```bash
-git push origin --delete v0.1.X
-git tag -d v0.1.X
+git push origin --delete v错误版本号
+git tag -d v错误版本号
 # 修正后升版本重发
-git tag v0.1.Y && git push origin v0.1.Y
+git tag v新版本号
+git push origin v新版本号
 ```
 
 ---
 
-## 五、开发人员本机更新
+## 六、开发人员本机更新
 
 ```bash
 kuaimai-cli upgrade
@@ -182,7 +261,7 @@ make build
 
 ---
 
-## 六、普通用户安装
+## 七、普通用户安装
 
 ```bash
 npx @kuaimai-cli/cli@latest install
@@ -194,7 +273,7 @@ kuaimai-cli registry sync --output json
 
 ---
 
-## 七、闭环链路（牢记）
+## 八、闭环链路（牢记）
 
 ```text
 代码修改 & 推送 main（CI）

@@ -60,16 +60,16 @@ func TestWriteSkillTreeAtRoot(t *testing.T) {
 	dir := t.TempDir()
 	files := []skillFile{
 		{relPath: "SKILL.md", body: []byte("# item\n")},
-		{relPath: "references/kuaimai-item-list.md", body: []byte("# list\n")},
+		{relPath: "references/kuaimai-erp-item-list.md", body: []byte("# list\n")},
 	}
-	skillMD, err := writeSkillTreeAtRoot(dir, "kuaimai-item", files)
+	skillMD, err := writeSkillTreeAtRoot(dir, "kuaimai-erp-item", files)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if skillMD != filepath.Join(dir, "kuaimai-item", "SKILL.md") {
+	if skillMD != filepath.Join(dir, "kuaimai-erp-item", "SKILL.md") {
 		t.Fatalf("skillMD = %q", skillMD)
 	}
-	refPath := filepath.Join(dir, "kuaimai-item", "references", "kuaimai-item-list.md")
+	refPath := filepath.Join(dir, "kuaimai-erp-item", "references", "kuaimai-erp-item-list.md")
 	if _, err := os.Stat(refPath); err != nil {
 		t.Fatalf("reference missing: %v", err)
 	}
@@ -81,14 +81,60 @@ func TestHasReferences(t *testing.T) {
 	_ = os.Setenv("HOME", dir)
 	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
 
-	refDir := filepath.Join(dir, ".agents", "skills", "kuaimai-item", "references")
+	refDir := filepath.Join(dir, ".agents", "skills", "kuaimai-erp-item", "references")
 	_ = os.MkdirAll(refDir, 0o700)
-	ok, err := HasReferences("kuaimai-item")
+	ok, err := HasReferences("kuaimai-erp-item")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !ok {
 		t.Fatal("expected references to exist")
+	}
+}
+
+func TestDefaultsInstalledInAllRootsRequiresEveryRoot(t *testing.T) {
+	dir := t.TempDir()
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", dir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
+
+	cursorRoot := filepath.Join(dir, ".cursor", "skills")
+	for _, name := range DefaultSkillNames {
+		if err := os.MkdirAll(filepath.Join(cursorRoot, name, "references"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(cursorRoot, name, "SKILL.md"), []byte("# "+name+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ok, err := DefaultsInstalledInAllRoots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Fatal("expected false when only .cursor is installed")
+	}
+
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		for _, name := range DefaultSkillNames {
+			if err := os.MkdirAll(filepath.Join(root, name, "references"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, name, "SKILL.md"), []byte("# "+name+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	ok, err = DefaultsInstalledInAllRoots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected true when every root has default skills and references")
 	}
 }
 

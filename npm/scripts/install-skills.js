@@ -5,7 +5,8 @@ const os = require("os");
 const path = require("path");
 
 const PKG = "@kuaimai-cli/cli";
-const DEFAULT_SKILL_NAMES = ["kuaimai-shared", "kuaimai-item", "kuaimai-scm"];
+const DEFAULT_SKILL_NAMES = ["kuaimai-shared", "kuaimai-erp-item", "kuaimai-scm-item"];
+const LEGACY_DEFAULT_SKILL_NAMES = ["kuaimai-item", "kuaimai-scm"];
 
 function agentSkillRoots() {
   const home = os.homedir();
@@ -74,14 +75,17 @@ function copyDirRecursive(src, dest) {
 }
 
 function skillsAlreadyInstalled() {
-  const refDir = path.join(os.homedir(), ".cursor", "skills", "kuaimai-item", "references");
-  const skillMD = path.join(os.homedir(), ".cursor", "skills", "kuaimai-item", "SKILL.md");
-  const scmMD = path.join(os.homedir(), ".cursor", "skills", "kuaimai-scm", "SKILL.md");
-  return fs.existsSync(skillMD) && fs.existsSync(scmMD) && fs.existsSync(refDir);
+  return agentSkillRoots().every((root) =>
+    DEFAULT_SKILL_NAMES.every((name) => {
+      const skillMD = path.join(root, name, "SKILL.md");
+      const refDir = path.join(root, name, "references");
+      return fs.existsSync(skillMD) && fs.existsSync(refDir);
+    })
+  );
 }
 
 function installBundledSkills({ names = DEFAULT_SKILL_NAMES, force = false } = {}) {
-  if (!force && skillsAlreadyInstalled()) {
+ if (!force && skillsAlreadyInstalled()) {
     return { skipped: true, source: null, names: [] };
   }
   const bundled = resolveBundledSkillsRoot();
@@ -98,6 +102,11 @@ function installBundledSkills({ names = DEFAULT_SKILL_NAMES, force = false } = {
   }
   for (const root of agentSkillRoots()) {
     fs.mkdirSync(root, { recursive: true });
+    if (isDefaultSkillSet(names)) {
+      for (const name of [...DEFAULT_SKILL_NAMES, ...LEGACY_DEFAULT_SKILL_NAMES]) {
+        fs.rmSync(path.join(root, name), { recursive: true, force: true });
+      }
+    }
     for (const name of names) {
       const src = path.join(bundled, name);
       const dest = path.join(root, name);
@@ -108,8 +117,14 @@ function installBundledSkills({ names = DEFAULT_SKILL_NAMES, force = false } = {
   return { skipped: false, source: bundled, names };
 }
 
+function isDefaultSkillSet(names) {
+  if (!Array.isArray(names) || names.length !== DEFAULT_SKILL_NAMES.length) return false;
+  return DEFAULT_SKILL_NAMES.every((name) => names.includes(name));
+}
+
 module.exports = {
   DEFAULT_SKILL_NAMES,
+  LEGACY_DEFAULT_SKILL_NAMES,
   agentSkillRoots,
   packageRoots,
   resolveBundledSkillsRoot,

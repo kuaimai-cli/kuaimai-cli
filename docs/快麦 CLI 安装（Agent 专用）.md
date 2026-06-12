@@ -32,36 +32,36 @@ kuaimai-cli skill install --force  # 强制覆盖重装
 | Skill | 版本 | 职责 |
 |-------|------|------|
 | `kuaimai-shared` | v1.1.0 | auth、输出、**registry 发现流程**（capabilities → schema → web call） |
-| `kuaimai-item` | v3.0.0 | 商品域**意图路由** + item shortcuts 工作流 |
-| `kuaimai-scm` | v2.0.0 | 供应链域**意图路由** + `web call scm.*` 工作流 |
+| `kuaimai-erp-item` | v3.0.0 | 商品域**意图路由** + item shortcuts 工作流 |
+| `kuaimai-scm-item` | v2.0.0 | SCM 可铺货商品、铺货 shortcuts + `web call scm.*` 工作流 |
 
 安装后目录结构示例：
 
 ```text
-~/.agents/skills/kuaimai-item/
+~/.agents/skills/kuaimai-erp-item/
 ├── SKILL.md
 └── references/
-    ├── kuaimai-item-list.md
-    ├── kuaimai-item-count.md
-    ├── kuaimai-item-get-detail.md
-    ├── kuaimai-item-update-title.md
-    ├── kuaimai-item-save.md
-    ├── kuaimai-item-meta-execution.md
-    ├── kuaimai-item-web-call.md
-    ├── kuaimai-item-count-dimensions.md
-    ├── kuaimai-item-query-count.md
-    └── kuaimai-item-query-list-v2.md
+    ├── kuaimai-erp-item-list.md
+    ├── kuaimai-erp-item-count.md
+    ├── kuaimai-erp-item-get-detail.md
+    ├── kuaimai-erp-item-update-title.md
+    ├── kuaimai-erp-item-save.md
+    ├── kuaimai-erp-item-meta-execution.md
+    ├── kuaimai-erp-item-web-call.md
+    ├── kuaimai-erp-item-count-dimensions.md
+    ├── kuaimai-erp-item-query-count.md
+    └── kuaimai-erp-item-query-list-v2.md
 
-~/.agents/skills/kuaimai-scm/
+~/.agents/skills/kuaimai-scm-item/
 ├── SKILL.md
 └── references/
     ├── kuaimai-scm-domain-routing.md
-    ├── kuaimai-scm-meta-execution.md
-    ├── kuaimai-scm-web-call.md
-    ├── kuaimai-scm-staff.md
-    ├── kuaimai-scm-logging.md
-    ├── kuaimai-scm-item-base.md
-    └── kuaimai-scm-dsb.md
+    ├── kuaimai-scm-item-meta-execution.md
+    ├── kuaimai-scm-item-web-call.md
+    ├── kuaimai-scm-item-staff.md
+    ├── kuaimai-scm-item-logging.md
+    ├── kuaimai-scm-item-item-base.md
+    └── kuaimai-scm-item-dsb.md
 ```
 
 **Agent 使用约定（对标飞书 lark-shared + lark-calendar）**：
@@ -73,8 +73,8 @@ kuaimai-cli skill install --force  # 强制覆盖重装
    kuaimai-cli schema <apiId> --output json
    kuaimai-cli web call <apiId> --params/--data/--body '...' --output json
    ```
-3. **商品域**：Read `kuaimai-item/SKILL.md`；有 shortcut 优先 `item +list` 等；写操作须先 Read 对应 `references/`
-4. **供应链域**：Read `kuaimai-scm/SKILL.md`；统一 `web call scm.<operation>`（无 shortcuts）
+3. **商品域**：Read `kuaimai-erp-item/SKILL.md`；有 shortcut 优先 `erp-item +list` 等；写操作须先 Read 对应 `references/`
+4. **SCM 可铺货商品**：Read `kuaimai-scm-item/SKILL.md`；PDD 铺货优先 `scm-item publish-pdd`，其它 scm 接口走 `web call scm.<operation>`
 5. 全量翻页：`--page-all`；Agent 续查 `--page-confirm yes`；限条数 `--page-limit`
 
 ## 第 3 步 初始化配置
@@ -89,6 +89,12 @@ kuaimai-cli config init
 registry:
   source: "http://open-cli.kuaimai.com/registry/registry.json"
   auto_sync: true
+```
+
+安装向导会在配置初始化后主动执行一次 `registry sync`。如安装时网络不可达，安装不会中断，后续可手动执行：
+
+```shell
+kuaimai-cli registry sync --output json
 ```
 
 ## 第 4 步 账号登录
@@ -110,6 +116,8 @@ kuaimai-cli capabilities --output json
 
 `doctor` 检查 config、auth、PATH、**registry 缓存**、Skill（含 `references/`）。`ready: true` 表示环境就绪。
 
+`doctor --output json` 还会返回 `skill_roots`，逐项展示 `~/.agents/skills`、`~/.cursor/skills`、`~/.codex/skills`、`~/.claude/skills`、`~/.windsurf/skills` 下 `kuaimai-shared`、`kuaimai-erp-item`、`kuaimai-scm-item` 与 `references/` 是否齐全。任一目录缺失时，执行 `kuaimai-cli skill install --force` 修复。
+
 跳过 registry 自动同步（调试）：`KUAIMAI_CLI_SKIP_REGISTRY_SYNC=1`
 
 ## 第 6 步 试一条命令
@@ -120,7 +128,7 @@ kuaimai-cli web call api.luotao.test.get \
   --params '{"keyword":"测试"}' --output json
 
 # 商品 shortcut（需有效 token + ERP 可达）
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"关键字","pageNo":1,"pageSize":10}' --output json
 ```
 

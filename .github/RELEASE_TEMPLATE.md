@@ -29,10 +29,10 @@
 ## 能力快照（主线）
 
 - **Registry**：远端 `registry.json` v2 + `capabilities` / `schema` / `web call` / `registry sync`
-- **shortcuts**：`item +list` / `count` / `get-detail` / `save` / `update-title`
+- **shortcuts**：`erp-item +list` / `count` / `get-detail` / `save` / `update-title`
 - **已移除**：`service` 命令（统一 `web call <apiId>`）
 - **分页**：`--page-all` · `--page-limit` · `--page-confirm`
-- **Skill**：`kuaimai-shared` v1.1 + `kuaimai-item` v3 + `kuaimai-scm` v2（registry 发现进 shared）
+- **Skill**：`kuaimai-shared` v1.1 + `kuaimai-erp-item` v3 + `kuaimai-scm-item` v2（registry 发现进 shared）
 
 ---
 
@@ -84,7 +84,7 @@ kuaimai-cli --version
 kuaimai-cli registry sync --output json
 kuaimai-cli capabilities --output json
 kuaimai-cli schema api.luotao.test.get --output json
-kuaimai-cli item +list --body '{"pageNo":1,"pageSize":1}' --output json
+kuaimai-cli erp-item +list --body '{"pageNo":1,"pageSize":1}' --output json
 ```
 
 写操作请先 `--dry-run`。

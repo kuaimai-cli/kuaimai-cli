@@ -2,7 +2,18 @@
 
 本文件记录 kuaimai-cli 各版本的主要变更。
 
-## Unreleased
+## 0.2.5
+
+### Changed
+
+- **SCM 可铺货商品前置查询**：新增 `kuaimai-cli scm-item +list` 按款式编码/标题查询 SCM 可铺货商品，新增 `kuaimai-cli scm-item shops` 查询指定平台可铺货店铺并输出 `can_publish` / `disabled_reason`。
+- **Registry 自动同步**：从进程启动前的 `os.Args` 预判断改为 Cobra 解析后的 `PersistentPreRunE` 判断；`config/auth/doctor/skill/registry/upgrade/completion/help/version` 跳过 registry 同步，避免基础命令被远端 registry 可用性阻断。
+- **npm 安装向导**：`config init` 后主动执行一次 `registry sync`，将 registry 可用性问题提前到安装阶段暴露；同步失败不阻断安装。
+- **Skill 同步**：默认 Skill 完整性从“任一目录存在”升级为 5 个 Agent 目录全量检查（`.agents/.cursor/.codex/.claude/.windsurf`），缺任一目录或 `references/` 会触发重装；命令结束后的自动同步改为同步完成后再退出。
+- **Skill 重装策略**：默认 Skill 安装/自动同步会先删除旧默认目录（含历史 `kuaimai-item`、`kuaimai-scm`），再安装 `kuaimai-shared`、`kuaimai-erp-item`、`kuaimai-scm-item`，避免 Agent 读取旧路由。
+- **doctor**：新增 `skill_roots` 输出，逐目录展示默认 Skill 与 `references/` 是否齐全。
+- **SCM PDD 铺货 shortcut**：新增 `kuaimai-cli scm-item publish-pdd`，按款式编码定位任意 SCM 商品、按店铺名/ID 定位任意 PDD 店铺，执行临时配置与平台资料完整性校验；默认停在最终提交前，只有 `--submit` 才调用 `/pdd/batchPublishItem`，可加 `--check-log` 查询最近铺货日志与失败原因。
+- **SCM 铺货日志 shortcut**：新增 `kuaimai-cli scm-item publish-log`，支持按款式编码、店铺名/ID、时间范围查询 `/logging/publishLog`，并用 `--detail` 拉取 `/logging/publishLogDetail` 的单品状态和 `errorMessage`。
 
 ## 0.2.3
 
@@ -23,16 +34,16 @@
 - **`kuaimai-shared` v1.2.0**：补充网关配置与 429 排错说明
 - **Registry 消费路径**：`capabilities` → `schema` → `web call`；文档与 Skill 全面移除 `service item|scm` 写法
 - **`bootstrapRegistry`**：同步后不再动态注册 `service` 子命令树
-- **Skill 对标飞书瘦身**：`kuaimai-shared` v1.1 增加 registry 发现流程；`kuaimai-item` v3 / `kuaimai-scm` v2 移除硬编码 meta 表，仅保留意图路由、shortcuts 与 references；`kuaimai-*-service.md` 重命名为 `kuaimai-*-web-call.md`
+- **Skill 对标飞书瘦身**：`kuaimai-shared` v1.1 增加 registry 发现流程；`kuaimai-erp-item` v3 / `kuaimai-scm-item` v2 移除硬编码 meta 表，仅保留意图路由、shortcuts 与 references；`kuaimai-*-service.md` 重命名为 `kuaimai-*-web-call.md`
 
 ### Added (prior)
 
 - **meta_data.json v1.7.0**：新增 `scm` 域 **195** 个 operation（erp-scm staff/logging/item/dsb）；`item` 域 **1095** 个 operation；scm 使用 meta `baseUrl`（`https://scm.superboss.cc/`）
-- **Skill kuaimai-scm v1.0.0**：供应链域路由 + **7** 个 `references/`（domain-routing、meta-execution、service、staff、logging、item-base、dsb）
+- **Skill kuaimai-scm-item v1.0.0**：供应链域路由 + **7** 个 `references/`（domain-routing、meta-execution、service、staff、logging、item-base、dsb）
 - **`web call scm.<operation>`**：meta 驱动，自动请求 scm 域名；与 item 共用分页/dry-run/Schema 管线
 - **scm meta 生成脚本**：`scripts/generate_meta/generate_scm_meta.py`、`scripts/normalize_meta/normalize_scm_meta.py`
-- **`doctor`**：新增 `skill_kuaimai_scm` 检查（含 `references/`）
-- **`skill install`**：默认安装 `kuaimai-shared` + `kuaimai-item` + `kuaimai-scm`
+- **`doctor`**：新增 `skill_kuaimai_scm_item` 检查（含 `references/`）
+- **`skill install`**：默认安装 `kuaimai-shared` + `kuaimai-erp-item` + `kuaimai-scm-item`
 
 ### Changed
 
@@ -61,10 +72,10 @@
 - **`internal/pagination`**：`--page-all` 海量数据防护（500/1000 条阈值、交互 `[y/N]`、分片合并）
 - 全局参数 **`--page-limit`**、**`--page-confirm`**（`prompt` | `yes` | `no`）
 - **`web call item.item-query-list-v2`** 等 meta 驱动命令（无 shortcut 的接口走 service）
-- Skill **kuaimai-item v2.0.0**：架构分层说明 + 3 份新 references（meta-execution、service、query-list-v2）
+- Skill **kuaimai-erp-item v2.0.0**：架构分层说明 + 3 份新 references（meta-execution、service、query-list-v2）
 - `auth check`：探测 accessToken 与 API 连通性
 - `auth list` / `auth use` / `auth login --profile`：多账号 profile
-- `item update-title`：get-detail 合并后 save，简化改标题
+- `erp-item update-title`：get-detail 合并后 save，简化改标题
 - `kuaimai-cli upgrade`：对比 GitHub Release；**后续版本**默认 npm 一键升级（见 Unreleased）
 - `kuaimai-cli doctor`：安装自检
 - `tests/cli_e2e`：冒烟 E2E（mock HTTP）
@@ -77,9 +88,9 @@
 - **文档全量对齐代码**：`docs/` 索引、架构说明、开发白皮书、验收测试、Agent 选型流程、meta 定义规范
 - **发布与分发**：`npm/README.md`、`.goreleaser.yaml` Release 说明模板、`.github/RELEASE_TEMPLATE.md`；归档附带 `CHANGELOG.md`
 - `PostFormAllPages` / `RequestAllPages` 统一走 `internal/pagination`（硬上限 1000 页保留）
-- Skill 飞书风格对齐：`kuaimai-shared`、`kuaimai-item` 重写；`kuaimai-item/references/` 扩展至 **8** 份
+- Skill 飞书风格对齐：`kuaimai-shared`、`kuaimai-erp-item` 重写；`kuaimai-erp-item/references/` 扩展至 **8** 份
 - `skill install`：GitHub Contents API 递归安装整目录；API 失败时回退仅 `SKILL.md`
-- `doctor`：检测 `kuaimai-item` 是否含 `references/` 目录
+- `doctor`：检测 `kuaimai-erp-item` 是否含 `references/` 目录
 - `web call`：`contentType` 路由、`requestSchema` required 轻校验、Schema 默认值
 - `config init` 模板增加 `auth.profile` / `auth.profiles`
 - `AGENTS.md`：补充分页参数与 service 兜底说明
@@ -91,5 +102,5 @@
 ## 0.1.0
 
 - 阶段一～三：config / auth / api / item 域（list、count、get-detail、save）
-- Skill：kuaimai-item、kuaimai-shared
+- Skill：kuaimai-erp-item、kuaimai-shared
 - npm `@kuaimai-cli/cli` 与 GitHub Release 分发

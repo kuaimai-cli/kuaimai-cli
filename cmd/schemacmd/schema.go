@@ -170,15 +170,15 @@ func shortcutForAPIID(apiID string) string {
 	_, opName, _ := strings.Cut(apiID, ".")
 	switch opName {
 	case "stock-list":
-		return "item +list / item list"
+		return "erp-item +list / erp-item list"
 	case "stock-count":
-		return "item count"
+		return "erp-item count"
 	case "item-detail":
-		return "item get-detail"
+		return "erp-item get-detail"
 	case "item-save":
-		return "item save"
+		return "erp-item save"
 	case "item-update-title":
-		return "item update-title"
+		return "erp-item update-title"
 	default:
 		return "web call " + apiID
 	}

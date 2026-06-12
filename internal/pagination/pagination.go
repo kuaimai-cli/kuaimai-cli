@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Thresholds align with skills/kuaimai-item (Agent + CLI dual protection).
+// Thresholds align with skills/kuaimai-erp-item (Agent + CLI dual protection).
 const (
 	DefaultMaxPages        = 1000
 	PromptRecordThreshold  = 500

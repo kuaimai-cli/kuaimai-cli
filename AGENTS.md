@@ -37,7 +37,7 @@ kuaimai-cli → POST open-cli.kuaimai.com/api/forward → erp1 / scm
 
 ## 商品域（item）
 
-统一经 registry 发现后 `web call`（详见 `skills/kuaimai-item/SKILL.md`）：
+统一经 registry 发现后 `web call`（详见 `skills/kuaimai-erp-item/SKILL.md`）：
 
 ```bash
 kuaimai-cli capabilities --output json
@@ -49,7 +49,7 @@ kuaimai-cli web call <apiId> --body '{"title":"关键字","pageNo":1,"pageSize":
 
 ## 供应链域（scm）
 
-统一经 registry 发现后 `web call`（详见 `skills/kuaimai-scm/SKILL.md`）：
+统一经 registry 发现后 `web call`（详见 `skills/kuaimai-scm-item/SKILL.md`）：
 
 ```bash
 kuaimai-cli capabilities --output json
@@ -85,15 +85,15 @@ kuaimai-cli upgrade                    # 默认一键升级；仅检查加 --che
 ## Skill
 
 ```bash
-kuaimai-cli skill install                  # kuaimai-shared + kuaimai-item + kuaimai-scm
+kuaimai-cli skill install                  # kuaimai-shared + kuaimai-erp-item + kuaimai-scm-item
 kuaimai-cli skill install --if-stale
-kuaimai-cli skill install kuaimai-scm
+kuaimai-cli skill install kuaimai-scm-item
 ```
 
 **Agent 路由口诀**：
 
-- 供应链 / scm / 铺货 / 操作日志 → Read `kuaimai-scm/SKILL.md` → `capabilities` → `schema` → `web call`
-- ERP 商品 / 库存 / 改标题 → Read `kuaimai-item/SKILL.md` → `capabilities` → `schema` → `web call`
+- 供应链 / scm / 铺货 / 操作日志 → Read `kuaimai-scm-item/SKILL.md` → `capabilities` → `schema` → `web call`
+- ERP 商品 / 库存 / 改标题 → Read `kuaimai-erp-item/SKILL.md` → `capabilities` → `schema` → `web call`
 - 配置 / 登录 / 输出 → Read `kuaimai-shared/SKILL.md`
 
 **CRITICAL**：

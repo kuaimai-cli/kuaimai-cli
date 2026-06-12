@@ -130,7 +130,7 @@ kuaimai-cli web call api.luotao.test.get --params '{"keyword":"测试"}' --outpu
 ### 4.3 企业级能力
 
 ```bash
-kuaimai-cli item save --body '{"sysItemId":1,"title":"x"}' --dry-run --output json
+kuaimai-cli erp-item save --body '{"sysItemId":1,"title":"x"}' --dry-run --output json
 kuaimai-cli completion zsh > /dev/null
 ```
 
@@ -154,7 +154,7 @@ kuaimai-cli completion zsh > /dev/null
 ### 5.1 命令注册
 
 ```bash
-kuaimai-cli item --help
+kuaimai-cli erp-item --help
 ```
 
 - [ ] 子命令包含：`+list`、`list`、`count`、`get-detail`、`save`、`update-title`
@@ -162,7 +162,7 @@ kuaimai-cli item --help
 ### 5.2 按标题查询列表
 
 ```bash
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"2026","pageNo":1,"pageSize":10}' \
   --output json
 ```
@@ -172,7 +172,7 @@ kuaimai-cli item +list \
 - [ ] 精简 body（仅 `title`+分页）可工作（默认值由 CLI 补齐）
 
 ```bash
-kuaimai-cli item count --body '{"title":"2026"}' --output json
+kuaimai-cli erp-item count --body '{"title":"2026"}' --output json
 ```
 
 - [ ] 返回总数，筛选与 list 一致
@@ -180,7 +180,7 @@ kuaimai-cli item count --body '{"title":"2026"}' --output json
 ### 5.3 商品详情
 
 ```bash
-kuaimai-cli item get-detail --sys-item-id <有效sysItemId> --output json
+kuaimai-cli erp-item get-detail --sys-item-id <有效sysItemId> --output json
 ```
 
 - [ ] 返回商品详情 JSON
@@ -191,12 +191,12 @@ kuaimai-cli item get-detail --sys-item-id <有效sysItemId> --output json
 **方式 A — `update-title`（推荐）**
 
 ```bash
-kuaimai-cli item update-title \
+kuaimai-cli erp-item update-title \
   --sys-item-id <测试ID> \
   --title "CLI验收标题" \
   --dry-run --verbose --output json
 
-kuaimai-cli item update-title \
+kuaimai-cli erp-item update-title \
   --sys-item-id <测试ID> \
   --title "CLI验收标题" \
   --output json
@@ -206,17 +206,17 @@ kuaimai-cli item update-title \
 
 ```bash
 # 1. dry-run（<测试ID> 换成真实 sys-item-id）
-kuaimai-cli item save \
-  --body "$(kuaimai-cli item get-detail --sys-item-id <测试ID> --output json | jq -c '.data[0] | .title = "CLI验收标题" | .suiteBridgeList = .itemSuiteBridgeList | del(.itemSuiteBridgeList)')" \
+kuaimai-cli erp-item save \
+  --body "$(kuaimai-cli erp-item get-detail --sys-item-id <测试ID> --output json | jq -c '.data[0] | .title = "CLI验收标题" | .suiteBridgeList = .itemSuiteBridgeList | del(.itemSuiteBridgeList)')" \
   --dry-run --verbose --output json
 
 # 2. 正式保存
-kuaimai-cli item save \
-  --body "$(kuaimai-cli item get-detail --sys-item-id <测试ID> --output json | jq -c '.data[0] | .title = "CLI验收标题" | .suiteBridgeList = .itemSuiteBridgeList | del(.itemSuiteBridgeList)')" \
+kuaimai-cli erp-item save \
+  --body "$(kuaimai-cli erp-item get-detail --sys-item-id <测试ID> --output json | jq -c '.data[0] | .title = "CLI验收标题" | .suiteBridgeList = .itemSuiteBridgeList | del(.itemSuiteBridgeList)')" \
   --output json
 
 # 3. 验证
-kuaimai-cli item +list --body '{"title":"CLI验收","pageNo":1,"pageSize":10}' --output json
+kuaimai-cli erp-item +list --body '{"title":"CLI验收","pageNo":1,"pageSize":10}' --output json
 ```
 
 - [ ] dry-run 不发送写请求，`stderr` 有脱敏预览
@@ -227,17 +227,17 @@ kuaimai-cli item +list --body '{"title":"CLI验收","pageNo":1,"pageSize":10}' -
 
 ```bash
 kuaimai-cli skill list --output json
-kuaimai-cli skill install kuaimai-item
-kuaimai-cli skill install kuaimai-scm
+kuaimai-cli skill install kuaimai-erp-item
+kuaimai-cli skill install kuaimai-scm-item
 ```
 
-- [ ] 能列出 `kuaimai-item`、`kuaimai-shared`、`kuaimai-scm`
+- [ ] 能列出 `kuaimai-erp-item`、`kuaimai-shared`、`kuaimai-scm-item`
 - [ ] `skill install` 写入 `~/.agents/skills/<name>/` 整目录（`SKILL.md` + `references/`）
-- [ ] `kuaimai-item/references/` 含 **10** 个工作流文档
-- [ ] `kuaimai-scm/references/` 含 **7** 个工作流文档（含 `kuaimai-scm-web-call.md`）
-- [ ] `kuaimai-item/SKILL.md` 含 CRITICAL 读 shared、Shortcuts 表、意图路由（**无**硬编码 meta 大表）
+- [ ] `kuaimai-erp-item/references/` 含 **10** 个工作流文档
+- [ ] `kuaimai-scm-item/references/` 含 **7** 个工作流文档（含 `kuaimai-scm-item-web-call.md`）
+- [ ] `kuaimai-erp-item/SKILL.md` 含 CRITICAL 读 shared、Shortcuts 表、意图路由（**无**硬编码 meta 大表）
 - [ ] `kuaimai-shared/SKILL.md` 含 registry 发现流程（capabilities → schema → web call）
-- [ ] `kuaimai-scm/SKILL.md` 含 scm 路由表、`web call` 说明、item/scm 分流
+- [ ] `kuaimai-scm-item/SKILL.md` 含 scm 路由表、`web call` 说明、item/scm 分流
 - [ ] `kuaimai-shared/SKILL.md` 含 `metadata.cliHelp`，路由至 item/scm 域 Skill
 - [ ] `doctor` 检测 item 与 scm 的 `references/` 缺失时提示重装
 
@@ -258,11 +258,11 @@ kuaimai-cli web call scm.item-base-page --body '{"pageNo":1,"pageSize":5}' --out
 ### 5.6 多格式输出（需 list 有数据）
 
 ```bash
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"2026","pageNo":1,"pageSize":10}' \
   --output csv
 
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"2026","pageNo":1,"pageSize":10}' \
   --output ndjson
 ```
@@ -279,12 +279,12 @@ kuaimai-cli item +list \
 
 ```bash
 # 全量翻页（大数据环境）
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"2026","pageNo":1,"pageSize":50}' \
   --page-all --output json
 
 # 限制条数 + 自动续查（Agent/脚本）
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"2026","pageNo":1,"pageSize":50}' \
   --page-all --page-limit 100 --page-confirm yes --output json
 
@@ -330,7 +330,7 @@ kuaimai-cli auth check --output json
 ### 6.3 改标题 shortcut
 
 ```bash
-kuaimai-cli item update-title --sys-item-id <id> --title "新标题" --dry-run --output json
+kuaimai-cli erp-item update-title --sys-item-id <id> --title "新标题" --dry-run --output json
 ```
 
 - [ ] dry-run 不发送写请求；正式执行后标题已更新
@@ -357,7 +357,7 @@ kuaimai-cli schema api.luotao.test.get --output json
 
 1. 阶段一全部通过后再扩展阶段二  
 2. 阶段三以 **item 标题查改** 为业务验收基准  
-3. 新接口：在 api-onboard 发布至 open-cli `registry.json` → `registry sync` 验收 → 更新 Skill references；item 高频可选 `shortcuts/item`  
+3. 新接口：在 api-onboard 发布至 open-cli `registry.json` → `registry sync` 验收 → 更新 Skill references；item 高频可选 `shortcuts/erp-item`  
 
 ---
 

@@ -7,7 +7,7 @@
 ```text
 kuaimaierp-cli-auto  →  POST kuaimai-cli-open  →  registry.json
                                                       ↓ GET
-kuaimai-cli（每次命令前自动 SyncIfNeeded）  →  ~/.kuaimai-cli/registry/registry.json
+kuaimai-cli（registry-backed 命令前自动 SyncIfNeeded）  →  ~/.kuaimai-cli/registry/registry.json
                                                       ↓
 capabilities / schema / web call
 ```
@@ -16,15 +16,16 @@ capabilities / schema / web call
 
 ## 自动同步行为
 
-1. 进程启动时（`Execute()`）执行 `bootstrapRegistry`
-2. 读取 `config.yaml` 中 `registry.source` 与 `registry.auto_sync`
-3. 本地无缓存 → 全量拉取
-4. 本地有缓存 → 带 `If-None-Match` 条件请求（ETag 未变则 304，不重复写入）
-5. version 变化时 stderr 提示：`registry 已更新: version=... apis=...`
-6. 网络失败但本地有缓存 → 使用缓存并 stderr 警告
-7. 同步后 `schema` / `web call` 自动使用最新 registry
+1. Cobra 解析出具体命令后，在 `PersistentPreRunE` 执行 `bootstrapRegistry`
+2. 仅 registry-backed 命令自动同步；`config`、`auth`、`doctor`、`skill`、`registry`、`upgrade`、`completion`、`help`、`version` 跳过
+3. 读取 `config.yaml` 中 `registry.source` 与 `registry.auto_sync`
+4. 本地无缓存 → 全量拉取
+5. 本地有缓存 → 带 `If-None-Match` 条件请求（ETag 未变则 304，不重复写入）
+6. version 变化时 stderr 提示：`registry 已更新: version=... apis=...`
+7. 网络失败但本地有缓存 → 使用缓存并 stderr 警告
+8. 同步后 `capabilities` / `schema` / `web call` 自动使用最新 registry
 
-**跳过的命令**：`registry`、`config`、`auth`、`upgrade`、`completion`、`help`、`version`
+安装向导 `npx @kuaimai-cli/cli@latest install` 会在 `config init` 后主动执行一次 `registry sync`，把 registry 可用性问题提前暴露到安装阶段；失败不会中断安装，用户可稍后手动执行 `kuaimai-cli registry sync`。
 
 ## 配置
 

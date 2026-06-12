@@ -29,7 +29,10 @@ const messages = {
     step3Skip: "跳过配置",
     step3Done: "配置已初始化",
     step3Fail: "配置失败。运行: kuaimai-cli config init",
-    step4: "登录",
+    step4: "正在同步 Registry...",
+    step4Done: "Registry 已同步",
+    step4Fail: "Registry 同步失败。安装已完成，后续可运行: kuaimai-cli registry sync",
+    step5: "登录",
     step4Hint:
       'accessToken 须由用户提供。如尚未持有，请联系 ERP 管理员申请分配；拿到 token 后运行:\n  kuaimai-cli auth login "<accessToken>"',
     step4Skip: '跳过登录。后续向 ERP 管理员申请 accessToken 后运行 kuaimai-cli auth login "<accessToken>"',
@@ -234,8 +237,19 @@ async function stepConfigInit(msg) {
   }
 }
 
+async function stepRegistrySync(msg) {
+  const s = p.spinner();
+  s.start(msg.step4);
+  try {
+    runCLI(["registry", "sync"], { timeout: 30000 });
+    s.stop(msg.step4Done);
+  } catch (_) {
+    s.stop(msg.step4Fail);
+  }
+}
+
 async function stepAuthHint(msg) {
-  p.log.step(msg.step4);
+  p.log.step(msg.step5);
   p.log.info(msg.step4Hint);
 }
 
@@ -247,6 +261,7 @@ async function runSetup(msg) {
   ensureAllBinaries();
   await stepInstallSkills(msg, { refreshedCLI: refreshedCLI || forceInstall() });
   await stepConfigInit(msg);
+  await stepRegistrySync(msg);
   await stepAuthHint(msg);
 }
 

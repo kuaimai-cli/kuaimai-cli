@@ -11,7 +11,7 @@ import (
 	"github.com/kuaimai-cli/kuaimai-cli/internal/cmdutil"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/config"
 	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
-	"github.com/kuaimai-cli/kuaimai-cli/shortcuts/item"
+	item "github.com/kuaimai-cli/kuaimai-cli/shortcuts/erp-item"
 	"github.com/spf13/cobra"
 )
 

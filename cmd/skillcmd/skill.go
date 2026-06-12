@@ -45,8 +45,8 @@ func installCmd() *cobra.Command {
 	var force bool
 	c := &cobra.Command{
 		Use:   "install [name...]",
-		Short: "安装 Skill 到各 Agent 目录（无参数时安装 kuaimai-shared、kuaimai-item、kuaimai-scm）",
-		Long: "覆盖写入各 Agent 的 skill 目录（不删除其它 skill）。\n" +
+		Short: "安装 Skill 到各 Agent 目录（无参数时安装 kuaimai-shared、kuaimai-erp-item、kuaimai-scm-item）",
+		Long: "覆盖写入各 Agent 的 skill 目录；默认 Skills 会先删除旧默认目录再重装（不删除非默认用户 skill）。\n" +
 			"优先从 npm 包内置 skills/ 或仓库 skills/ 复制；不可用时回退 GitHub。\n" +
 			"无参数时默认仅在未安装、Release 或 CLI 版本变化时更新（等同 --if-stale）；" +
 			"任意命令结束后也会在后台自动同步（24h 缓存，见 KUAIMAI_CLI_SKIP_SKILL_SYNC）。",

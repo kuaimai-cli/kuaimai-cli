@@ -14,8 +14,8 @@ metadata:
 
 | 用户意图 | 下一步 Skill |
 |----------|--------------|
-| 商品列表、统计、详情、改标题 | [`kuaimai-item`](../kuaimai-item/SKILL.md) |
-| 供应链、铺货日志、scm 商品 | [`kuaimai-scm`](../kuaimai-scm/SKILL.md) |
+| ERP 商品档案：查询、列表、统计、详情、新增、编辑、改标题 | [`kuaimai-erp-item`](../kuaimai-erp-item/SKILL.md) |
+| SCM 商品 / 可铺货商品：供应链商品、分销商品、上货、铺货、铺货日志 | [`kuaimai-scm-item`](../kuaimai-scm-item/SKILL.md) |
 | 配置、登录、registry 发现、输出格式 | **本 Skill** |
 
 ## CLI 可执行文件
@@ -32,7 +32,7 @@ metadata:
 
 | 层级 | 示例 | 何时用 |
 |------|------|--------|
-| **1. Shortcuts** | `item +list`、`item update-title` | 有 curated shortcut 时 **优先** |
+| **1. Shortcuts** | `erp-item +list`、`erp-item update-title` | 有 curated shortcut 时 **优先** |
 | **2. web call** | `web call api.luotao.test.get` | registry 已发布接口（**主路径**） |
 | **3. api** | `api POST /item/stock/queryList` | registry 未覆盖时的最后手段 |
 
@@ -43,6 +43,12 @@ metadata:
 无 shortcut → capabilities → schema <apiId> → web call <apiId>
 不知道有哪些接口 → capabilities 或 schema 全量
 ```
+
+**商品口径必须先分清**：
+
+- 用户说“商品档案”的查询、列表、详情、新增、编辑、改标题 → `kuaimai-erp-item`。
+- 用户说“上货/铺货/发布到店铺/供应链商品/SCM 商品/分销商品” → `kuaimai-scm-item`。
+- 只说“商品”但目标是铺货到店铺 → 视为 `kuaimai-scm-item`；只说“商品”且目标是档案资料维护 → 视为 `kuaimai-erp-item`。
 
 ## Registry 接口发现（核心）
 

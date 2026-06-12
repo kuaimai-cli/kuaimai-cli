@@ -15,17 +15,17 @@ import (
 )
 
 const (
-	skillSyncFile          = "skill-sync.json"
+	skillSyncFile             = "skill-sync.json"
 	defaultSkillCheckInterval = 24 * time.Hour
 )
 
 // SyncState records the last skill sync relative to CLI / release.
 type SyncState struct {
-	CLIVersion           string    `json:"cli_version"`
-	ReleaseRef           string    `json:"release_ref"`
-	SyncedAt             time.Time `json:"synced_at"`
-	LastReleaseCheckAt   time.Time `json:"last_release_check_at,omitempty"`
-	CachedLatestRelease  string    `json:"cached_latest_release,omitempty"`
+	CLIVersion          string    `json:"cli_version"`
+	ReleaseRef          string    `json:"release_ref"`
+	SyncedAt            time.Time `json:"synced_at"`
+	LastReleaseCheckAt  time.Time `json:"last_release_check_at,omitempty"`
+	CachedLatestRelease string    `json:"cached_latest_release,omitempty"`
 }
 
 func skillSyncPath() string {
@@ -98,16 +98,11 @@ func latestReleaseRefCached(repo string) (string, error) {
 }
 
 func defaultSkillsMissing() (bool, error) {
-	for _, name := range DefaultSkillNames {
-		ok, err := IsInstalled(name)
-		if err != nil {
-			return false, err
-		}
-		if !ok {
-			return true, nil
-		}
+	ok, err := DefaultsInstalledInAllRoots()
+	if err != nil {
+		return false, err
 	}
-	return false, nil
+	return !ok, nil
 }
 
 // NeedsSync reports whether skills should be refreshed (bundled npm/repo or GitHub release).
@@ -234,8 +229,8 @@ func ShouldSkipSkillAutoSync(cmd *cobra.Command) bool {
 	return false
 }
 
-// MaybeAutoSync refreshes default skills in the background when missing, CLI
-// version changed, or bundled/npm skills / GitHub release advanced.
+// MaybeAutoSync refreshes default skills after a command finishes when missing,
+// CLI version changed, or bundled/npm skills / GitHub release advanced.
 func MaybeAutoSync(cmd *cobra.Command) {
 	if ShouldSkipSkillAutoSync(cmd) {
 		return
@@ -243,19 +238,17 @@ func MaybeAutoSync(cmd *cobra.Command) {
 	if build.Version == "" || build.Version == "dev" {
 		return
 	}
-	go func() {
-		updated, _, err := InstallIfStale(InstallOptions{Repo: defaultGitHubRepo})
-		if err != nil {
-			fmt.Fprintf(os.Stderr,
-				"[kuaimai-cli] Skill 自动同步失败: %v（可运行: kuaimai-cli skill install）\n",
-				err,
-			)
-			return
-		}
-		if updated {
-			fmt.Fprintf(os.Stderr, "[kuaimai-cli] Skills 已自动同步至最新 Release\n")
-		}
-	}()
+	updated, _, err := InstallIfStale(InstallOptions{Repo: defaultGitHubRepo})
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"[kuaimai-cli] Skill 自动同步失败: %v（可运行: kuaimai-cli skill install）\n",
+			err,
+		)
+		return
+	}
+	if updated {
+		fmt.Fprintf(os.Stderr, "[kuaimai-cli] Skills 已自动同步至最新 Release\n")
+	}
 }
 
 // MaybeSyncOnCLIVersionChange is deprecated; use MaybeAutoSync.

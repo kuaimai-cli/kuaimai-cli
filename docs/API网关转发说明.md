@@ -112,5 +112,5 @@ curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/api/forward
 
 # 3. CLI dry-run 预览网关路径
 cd kuaimai-cli && make build
-./kuaimai-cli item +list --body '{"pageNo":1,"pageSize":1}' --dry-run --verbose
+./kuaimai-cli erp-item +list --body '{"pageNo":1,"pageSize":1}' --dry-run --verbose
 ```

@@ -5,7 +5,7 @@ const path = require("path");
 
 const repoSkills = path.join(__dirname, "..", "..", "skills");
 const npmSkills = path.join(__dirname, "..", "skills");
-const required = ["kuaimai-shared", "kuaimai-item", "kuaimai-scm"];
+const required = ["kuaimai-shared", "kuaimai-erp-item", "kuaimai-scm-item"];
 
 function copyDirRecursive(src, dest) {
   fs.mkdirSync(dest, { recursive: true });

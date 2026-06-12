@@ -1,7 +1,7 @@
 # Agent 命令选型与 schema 流程
 
 > 说明 AI Agent 如何将用户自然语言路由到 **shortcuts**（`item …`）或 **web call**（`web call …`），以及 **何时查询 `schema`**。  
-> 配套：[Registry远端同步说明](./Registry远端同步说明.md) · [系统架构与飞书对标说明](./系统架构与飞书对标说明.md) · [AGENTS.md](../AGENTS.md) · [kuaimai-item/SKILL.md](../skills/kuaimai-item/SKILL.md) · [kuaimai-scm/SKILL.md](../skills/kuaimai-scm/SKILL.md)
+> 配套：[Registry远端同步说明](./Registry远端同步说明.md) · [系统架构与飞书对标说明](./系统架构与飞书对标说明.md) · [AGENTS.md](../AGENTS.md) · [kuaimai-erp-item/SKILL.md](../skills/kuaimai-erp-item/SKILL.md) · [kuaimai-scm-item/SKILL.md](../skills/kuaimai-scm-item/SKILL.md)
 
 ---
 
@@ -9,17 +9,17 @@
 
 | 层级 | 命令示例 | 实现 | Agent 默认 |
 |------|----------|------|------------|
-| **1. shortcuts** | `item +list`、`item update-title` | `shortcuts/item/` | ✅ item 域优先 |
+| **1. shortcuts** | `erp-item +list`、`erp-item update-title` | `shortcuts/erp-item/` | ✅ item 域优先 |
 | **2. web call** | `web call item.stock-list`、`web call scm.staff-query` | `registry.json` + `cmd/webcmd` | item 兜底 / **scm 唯一入口** |
 | **3. api** | `api POST /item/stock/queryList` | `cmd/api` | 最后手段 |
 
-飞书对标：`calendar +agenda` → `item +list` · `calendar events list` → `web call item.stock-list` · 原生 path → `api POST …`
+飞书对标：`calendar +agenda` → `erp-item +list` · `calendar events list` → `web call item.stock-list` · 原生 path → `api POST …`
 
 **Agent 口诀**：
 
 ```text
 有 Shortcut（item 域）→ 不查 schema，读 Skill / references
-scm 域无 shortcuts → 读 kuaimai-scm Skill → web call scm.<operation>
+SCM 铺货优先 scm-item shortcut；其它 scm 接口 → 读 kuaimai-scm-item Skill → web call scm.<operation>
 走 web call / api → 先 schema 全量或 schema <apiId>，再执行
 不知道有哪些接口 → schema 全量
 item 与 scm 路径同为 /item/* 时 → 必读 kuaimai-scm-domain-routing.md 分流
@@ -34,8 +34,8 @@ flowchart TD
   NL[用户自然语言] --> RouteSkill{匹配哪个 Skill?}
 
   RouteSkill -->|配置/登录/输出/安装| Shared[kuaimai-shared]
-  RouteSkill -->|商品/标题/SKU/列表/详情/改名| ItemSkill[kuaimai-item/SKILL.md]
-  RouteSkill -->|供应链/铺货/操作日志/scm 商品| ScmSkill[kuaimai-scm/SKILL.md]
+  RouteSkill -->|商品/标题/SKU/列表/详情/改名| ItemSkill[kuaimai-erp-item/SKILL.md]
+  RouteSkill -->|供应链/铺货/操作日志/scm 商品| ScmSkill[kuaimai-scm-item/SKILL.md]
 
   Shared --> SharedCmd[config / auth / skill install / doctor …]
   ItemSkill --> ReadShared[CRITICAL: Read kuaimai-shared]
@@ -62,7 +62,7 @@ flowchart TD
   Prefer -->|prefer web call / 无 shortcut| Service[web call item.operation]
   Prefer -->|有 orchestration| Shortcut
 
-  Shortcut --> Exec1["kuaimai-cli item +list / count / update-title …"]
+  Shortcut --> Exec1["kuaimai-cli erp-item +list / count / update-title …"]
   Service --> Exec2["kuaimai-cli web call item.stock-list --body …"]
   NeedDiscover --> ApiFallback["api POST /item/… 最后兜底"]
   ApiFallback --> SchemaOne
@@ -84,13 +84,13 @@ flowchart TD
     E5[调用某个未文档化接口]
   end
 
-  Examples --> Table{kuaimai-item 选哪个命令表}
+  Examples --> Table{kuaimai-erp-item 选哪个命令表}
 
-  Table -->|统计+标题| C1[item count]
-  Table -->|列表/搜索+标题（库存）| C2[item +list]
+  Table -->|统计+标题| C1[erp-item count]
+  Table -->|列表/搜索+标题（库存）| C2[erp-item +list]
   Table -->|列表/搜索（档案 V2）| C2b[web call item.item-query-list-v2]
-  Table -->|已知 ID 查详情| C3[item get-detail]
-  Table -->|改标题| C4[item update-title]
+  Table -->|已知 ID 查详情| C3[erp-item get-detail]
+  Table -->|改标题| C4[erp-item update-title]
   Table -->|无匹配| Unknown[未覆盖能力]
 
   C1 --> S1[shortcut]
@@ -119,7 +119,7 @@ flowchart TD
 
 ## 3.1 供应链域：Skill 意图 → web call
 
-scm 域**无 shortcuts**，Agent 一律 Read `kuaimai-scm/SKILL.md` 后走 `web call scm.<operation>`。
+SCM 铺货已有 `scm-item publish-pdd` / `scm-item publish-log` shortcuts；其它 scm 接口 Read `kuaimai-scm-item/SKILL.md` 后走 `web call scm.<operation>`。
 
 | 用户意图 | meta operation | CLI 命令 |
 |----------|----------------|----------|
@@ -129,7 +129,7 @@ scm 域**无 shortcuts**，Agent 一律 Read `kuaimai-scm/SKILL.md` 后走 `web 
 | 供应链商品列表 | `item-base-page` | `web call scm.item-base-page` |
 | 平台铺货配置 | `dsb-query-distribution-config` | `web call scm.dsb-query-distribution-config` |
 
-**分流 CRITICAL**：路径同为 `/item/*` 时，`web call`（erp1）与 `web call`（scm.superboss.cc）语义不同，必读 [`kuaimai-scm-domain-routing.md`](../skills/kuaimai-scm/references/kuaimai-scm-domain-routing.md)。
+**分流 CRITICAL**：路径同为 `/item/*` 时，`web call`（erp1）与 `web call`（scm.superboss.cc）语义不同，必读 [`kuaimai-scm-domain-routing.md`](../skills/kuaimai-scm-item/references/kuaimai-scm-domain-routing.md)。
 
 **scm 域默认**：Skill 表能命中的直接 `web call`；不确定 operation 名时 `schema --output json`；写操作先 Read 对应 `references/` 并 `--dry-run`。
 
@@ -167,17 +167,17 @@ flowchart LR
 
 | 用户意图 | 选（shortcuts） | 不选 |
 |----------|-----------------|------|
-| 搜/列商品（库存页） | `item +list` | `web call item.stock-list` |
-| 搜/列商品（档案 V2） | `web call item.item-query-list-v2` | `item +list`（path 不同） |
-| 统计数量（库存页 / 标题） | `item count` | `item +list` 再人工数 |
-| 统计数量（商品档案 / 品牌类目等） | `web call item.item-query-count` | `item count`（库存口径）、`item-query-list-v2` 仅取 total |
-| 查详情 | `item get-detail --sys-item-id` | `web call item.item-detail --body '{"sysItemId":…}'` |
-| 改标题 | `item update-title` | `web call item.item-update-title`（无 get-detail 编排） |
-| 复杂改字段 | `item save` + references | `web call item.item-save` 须全量 body |
+| 搜/列商品（库存页） | `erp-item +list` | `web call item.stock-list` |
+| 搜/列商品（档案 V2） | `web call item.item-query-list-v2` | `erp-item +list`（path 不同） |
+| 统计数量（库存页 / 标题） | `erp-item count` | `erp-item +list` 再人工数 |
+| 统计数量（商品档案 / 品牌类目等） | `web call item.item-query-count` | `erp-item count`（库存口径）、`item-query-list-v2` 仅取 total |
+| 查详情 | `erp-item get-detail --sys-item-id` | `web call item.item-detail --body '{"sysItemId":…}'` |
+| 改标题 | `erp-item update-title` | `web call item.item-update-title`（无 get-detail 编排） |
+| 复杂改字段 | `erp-item save` + references | `web call item.item-save` 须全量 body |
 
 ### shortcuts 与 web call 行为差异（同接口）
 
-| 能力 | `item +list` | `web call item.stock-list` |
+| 能力 | `erp-item +list` | `web call item.stock-list` |
 |------|--------------|---------------------------|
 | 默认 body（ARCHIVE_V2） | ✅ | ❌ 需自传或 schema default |
 | `--dry-run` | ❌ 查询接口 | ❌ 查询接口（`write:false` 拒绝） |
@@ -240,7 +240,7 @@ flowchart TD
 sequenceDiagram
   participant U as 用户
   participant A as Agent
-  participant SK as kuaimai-item Skill
+  participant SK as kuaimai-erp-item Skill
   participant RF as references
   participant CLI as kuaimai-cli
 
@@ -249,12 +249,12 @@ sequenceDiagram
   SK-->>A: 只有标题无 ID → 先 +list
   Note over A: 不查 schema（Skill 已明确）
 
-  A->>CLI: item +list --body title:test
+  A->>CLI: erp-item +list --body title:test
   CLI-->>A: sysItemId 列表
   A->>U: 多条则让用户选
 
   A->>RF: Read update-title reference
-  A->>CLI: item update-title --dry-run …
+  A->>CLI: erp-item update-title --dry-run …
   CLI-->>A: 预览 save body
   A->>U: 确认后去掉 --dry-run 再执行
 
@@ -298,8 +298,8 @@ kuaimai-cli schema item.stock-list --output json   # 待远端发布后
 
 1. 在 `kuaimaierp-cli-auto` 完成 YAPI 拉取、评审，发布至 open-cli `registry.json`（见 [接口 JSON 设计](./接口JSON生成与同步系统设计.md)）  
 2. `kuaimai-cli registry sync` → `capabilities` / `schema <apiId>` / `web call` 验收  
-3. **item 高频**：可选 `shortcuts/item/` + 更新 `skills/kuaimai-item/references/`（SKILL 只保留意图路由，不写接口表）  
-4. **scm**：更新 `skills/kuaimai-scm/references/` 工作流（时间范围、分流等）  
+3. **item 高频**：可选 `shortcuts/erp-item/` + 更新 `skills/kuaimai-erp-item/references/`（SKILL 只保留意图路由，不写接口表）  
+4. **scm**：更新 `skills/kuaimai-scm-item/references/` 工作流（时间范围、分流等）  
 5. `node npm/scripts/sync-skills.js` 后发 npm 包
 
 ---
@@ -309,8 +309,8 @@ kuaimai-cli schema item.stock-list --output json   # 待远端发布后
 | 文档 | 说明 |
 |------|------|
 | [系统架构与飞书对标说明.md](./系统架构与飞书对标说明.md) | §3 三级命令、§5 dry-run、§6 Skill |
-| [kuaimai-item/SKILL.md](../skills/kuaimai-item/SKILL.md) | Agent 商品域路由与 references |
-| [kuaimai-scm/SKILL.md](../skills/kuaimai-scm/SKILL.md) | Agent 供应链域路由与 references |
+| [kuaimai-erp-item/SKILL.md](../skills/kuaimai-erp-item/SKILL.md) | Agent 商品域路由与 references |
+| [kuaimai-scm-item/SKILL.md](../skills/kuaimai-scm-item/SKILL.md) | Agent 供应链域路由与 references |
 | [AGENTS.md](../AGENTS.md) | 仓库根 Agent 约定 |
 | [Registry远端同步说明.md](./Registry远端同步说明.md) | 自动同步、capabilities、web call |
 | [接口JSON生成与同步系统设计.md](./接口JSON生成与同步系统设计.md) | api-onboard → registry 发布 |

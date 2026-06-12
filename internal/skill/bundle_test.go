@@ -35,17 +35,17 @@ func TestBundledSkillsRoot_fromEnv(t *testing.T) {
 func TestInstallFromBundled_writesReferences(t *testing.T) {
 	dir := t.TempDir()
 	bundled := filepath.Join(dir, "skills")
-	itemDir := filepath.Join(bundled, "kuaimai-item", "references")
+	itemDir := filepath.Join(bundled, "kuaimai-erp-item", "references")
 	if err := os.MkdirAll(itemDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bundled, "kuaimai-item", "SKILL.md"), []byte("# item\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(bundled, "kuaimai-erp-item", "SKILL.md"), []byte("# item\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(itemDir, "kuaimai-item-list.md"), []byte("# list\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(itemDir, "kuaimai-erp-item-list.md"), []byte("# list\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"kuaimai-shared", "kuaimai-scm"} {
+	for _, name := range []string{"kuaimai-shared", "kuaimai-scm-item"} {
 		skillDir := filepath.Join(bundled, name)
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			t.Fatal(err)
@@ -59,18 +59,66 @@ func TestInstallFromBundled_writesReferences(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 	t.Setenv("KUAIMAI_CLI_SKILLS_DIR", bundled)
 
-	res, err := installFromBundled(bundled, "kuaimai-item")
+	res, err := installFromBundled(bundled, "kuaimai-erp-item")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(res.Paths) == 0 {
 		t.Fatal("expected install paths")
 	}
-	ok, err := HasReferences("kuaimai-item")
+	ok, err := HasReferences("kuaimai-erp-item")
 	if err != nil || !ok {
 		t.Fatalf("HasReferences = %v, err = %v", ok, err)
 	}
 	_ = oldHome
+}
+
+func TestInstallDefaultsRemovesLegacyDefaultSkills(t *testing.T) {
+	dir := t.TempDir()
+	bundled := filepath.Join(dir, "skills")
+	for _, name := range DefaultSkillNames {
+		skillDir := filepath.Join(bundled, name, "references")
+		if err := os.MkdirAll(skillDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(bundled, name, "SKILL.md"), []byte("# "+name+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+	t.Setenv("KUAIMAI_CLI_SKILLS_DIR", bundled)
+	roots, err := AgentSkillRoots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		for _, name := range LegacyDefaultSkillNames {
+			legacyDir := filepath.Join(root, name)
+			if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(legacyDir, "SKILL.md"), []byte("# legacy\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	if _, err := InstallDefaults(InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		for _, name := range LegacyDefaultSkillNames {
+			if _, err := os.Stat(filepath.Join(root, name)); !os.IsNotExist(err) {
+				t.Fatalf("legacy skill still exists: %s", filepath.Join(root, name))
+			}
+		}
+		for _, name := range DefaultSkillNames {
+			if _, err := os.Stat(filepath.Join(root, name, "SKILL.md")); err != nil {
+				t.Fatalf("default skill missing: %s: %v", name, err)
+			}
+		}
+	}
 }
 
 func TestInstall_prefersBundledOverGitHub(t *testing.T) {

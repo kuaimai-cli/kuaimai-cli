@@ -36,7 +36,7 @@ kuaimai-cli doctor --output json
 ### 试一条命令
 
 ```bash
-kuaimai-cli item +list \
+kuaimai-cli erp-item +list \
   --body '{"title":"test","pageNo":1,"pageSize":10}' \
   --output json
 ```
@@ -116,7 +116,7 @@ kuaimai-cli --version
 
 1. 更新根目录 [CHANGELOG.md](../CHANGELOG.md)，合并 `main`，CI 为绿  
 2. 打 tag 并推送：`git tag v0.1.x && git push origin v0.1.x`  
-3. GitHub Actions `release.yml`：GoReleaser 创建 Release → 同步 `checksums.txt` → `npm publish`  
+3. GitHub Actions `release.yml`：GoReleaser 创建 Release → 同步 `checksums.txt` → 从 tag 自动写入 `npm/package.json` version → `npm publish`  
 4. 发布说明由 [.goreleaser.yaml](../.goreleaser.yaml) 的 `release.header` / `footer` 生成；手动编辑可参考 [.github/RELEASE_TEMPLATE.md](../.github/RELEASE_TEMPLATE.md)
 
 手动发布 npm（需已有 Release 与 `checksums.txt`）：
@@ -124,7 +124,8 @@ kuaimai-cli --version
 ```bash
 cp /path/to/checksums.txt npm/checksums.txt
 cd npm
-# 同步 package.json version 与 tag 一致
+# 仅手动 npm publish 时需要先同步 package.json version 与 tag 一致；
+# 正常 tag 发布由 release.yml 自动同步。
 npm publish --access public
 ```
 

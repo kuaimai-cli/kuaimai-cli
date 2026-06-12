@@ -17,7 +17,7 @@ func ShouldSkipAutoSync(cmd *cobra.Command) bool {
 	}
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
-		case "registry", "upgrade", "completion", "help", "version":
+		case "auth", "config", "completion", "doctor", "help", "registry", "skill", "upgrade", "version":
 			return true
 		}
 	}

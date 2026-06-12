@@ -51,7 +51,7 @@ kuaimai-cli/
 │   ├── apicall/          # registry 驱动 HTTP
 │   ├── client/, pagination/, output/
 │   └── ...
-├── shortcuts/item/       # 6 个 curated 命令
+├── shortcuts/erp-item/       # 6 个 curated 命令
 ├── skills/               # Agent 工作流（随 npm 发布）
 ├── npm/skills/           # sync-skills.js 同步副本
 └── tests/cli_e2e/
@@ -71,7 +71,7 @@ kuaimai-cli schema [apiId] --output json
 kuaimai-cli web call <apiId> [--params|--data|--body '...']
 kuaimai-cli registry sync | watch
 
-kuaimai-cli item +list | count | get-detail | save | update-title
+kuaimai-cli erp-item +list | count | get-detail | save | update-title
 kuaimai-cli api POST /path
 kuaimai-cli skill install
 ```
@@ -80,7 +80,7 @@ kuaimai-cli skill install
 
 | 层级 | 飞书 | 快麦 |
 |------|------|------|
-| Shortcuts | `calendar +agenda` | `item +list` |
+| Shortcuts | `calendar +agenda` | `erp-item +list` |
 | 元数据 | `calendar events list` | `web call <apiId>` |
 | 兜底 | `api GET /open-apis/...` | `api POST /path` |
 
@@ -111,8 +111,8 @@ kuaimaierp-cli-auto → open-cli.kuaimai.com/registry/registry.json
 | Skill | 版本 | 职责 |
 |-------|------|------|
 | kuaimai-shared | v1.1 | auth、registry 发现、输出、安全 |
-| kuaimai-item | v3 | 商品意图路由、shortcuts、references |
-| kuaimai-scm | v2 | 供应链意图路由、references |
+| kuaimai-erp-item | v3 | 商品意图路由、shortcuts、references |
+| kuaimai-scm-item | v2 | 供应链意图路由、references |
 
 发版前：`node npm/scripts/sync-skills.js`
 
@@ -120,7 +120,7 @@ kuaimaierp-cli-auto → open-cli.kuaimai.com/registry/registry.json
 
 1. 在 `kuaimaierp-cli-auto` 登记并发布至 open-cli registry
 2. `kuaimai-cli registry sync` 验证 `capabilities` / `schema` / `web call`
-3. item 高频接口可选：补 `shortcuts/item` + 更新 Skill references
+3. item 高频接口可选：补 `shortcuts/erp-item` + 更新 Skill references
 4. 验收见 [验收测试](./kuaimai-cli%20验收测试.md)
 
 ---
@@ -144,7 +144,7 @@ make build
 ./kuaimai-cli registry sync --output json
 ./kuaimai-cli capabilities --output json
 ./kuaimai-cli schema api.luotao.test.get --output json
-./kuaimai-cli item +list --body '{"title":"测试","pageNo":1,"pageSize":10}' --output json
+./kuaimai-cli erp-item +list --body '{"title":"测试","pageNo":1,"pageSize":10}' --output json
 go test -mod=vendor ./...
 ```
 

@@ -427,6 +427,28 @@ func (c *Client) PostJSON(ctx context.Context, path string, v any) (any, int, er
 	return c.Request(ctx, http.MethodPost, path, b)
 }
 
+// GetQuery performs a GET request with query parameters.
+func (c *Client) GetQuery(ctx context.Context, path string, params map[string]any) (any, int, error) {
+	if len(params) == 0 {
+		return c.Request(ctx, http.MethodGet, path, nil)
+	}
+	q := url.Values{}
+	for k, v := range params {
+		if v == nil {
+			continue
+		}
+		q.Set(k, formFieldValue(v))
+	}
+	if enc := q.Encode(); enc != "" {
+		if strings.Contains(path, "?") {
+			path += "&" + enc
+		} else {
+			path += "?" + enc
+		}
+	}
+	return c.Request(ctx, http.MethodGet, path, nil)
+}
+
 // PostForm POSTs application/x-www-form-urlencoded body to path.
 func (c *Client) PostForm(ctx context.Context, path string, form url.Values) (any, int, error) {
 	return c.requestWithRetry(ctx, http.MethodPost, path, []byte(form.Encode()), "application/x-www-form-urlencoded")

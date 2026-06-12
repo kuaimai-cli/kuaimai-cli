@@ -63,9 +63,9 @@ release:
     | 模块 | 说明 |
     |------|------|
     | Registry | 远端 `registry.json` v2 · `capabilities` / `schema` / `web call` / `registry sync` |
-    | shortcuts | `item +list` / `count` / `get-detail` / `save` / `update-title` |
+    | shortcuts | `erp-item +list` / `count` / `get-detail` / `save` / `update-title` |
     | 分页 | `--page-all` · `--page-limit` · `--page-confirm`（500/1000 条阈值防护） |
-    | Skill | `kuaimai-shared` v1.1 + `kuaimai-item` v3 + `kuaimai-scm` v2（`references/` 工作流） |
+    | Skill | `kuaimai-shared` v1.1 + `kuaimai-erp-item` v3 + `kuaimai-scm-item` v2（`references/` 工作流） |
 
     ### 安装（npm，推荐）
 
@@ -87,7 +87,7 @@ release:
 
     ### Agent
 
-    安装 Skill 后 Read `kuaimai-item/SKILL.md`；写操作先 Read `references/`。约定见 [AGENTS.md](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/AGENTS.md)。
+    安装 Skill 后 Read `kuaimai-erp-item/SKILL.md`；写操作先 Read `references/`。约定见 [AGENTS.md](https://github.com/kuaimai-cli/kuaimai-cli/blob/{{.Tag}}/AGENTS.md)。
 
   footer: |
     ### 升级

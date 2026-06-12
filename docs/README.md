@@ -43,7 +43,7 @@
 
 | 类型 | 示例 |
 |------|------|
-| Shortcuts | `item +list`、`item update-title`（6 个，手写） |
+| Shortcuts | `erp-item +list`、`erp-item update-title`（6 个，手写） |
 | Registry | `web call api.luotao.test.get`、`web call scm.staff-query`（待全量发布） |
 | 兜底 | `api POST /path` |
 
@@ -52,7 +52,7 @@
 ### Skill 职责（对标飞书）
 
 - `kuaimai-shared`：auth、输出、**registry 发现流程**
-- `kuaimai-item`：商品 shortcuts + references 工作流
-- `kuaimai-scm`：供应链意图路由 + `web call scm.*`
+- `kuaimai-erp-item`：商品 shortcuts + references 工作流
+- `kuaimai-scm-item`：供应链意图路由 + `web call scm.*`
 
 变更记录：[CHANGELOG.md](../CHANGELOG.md)

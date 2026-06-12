@@ -23,7 +23,8 @@ import (
 	"github.com/kuaimai-cli/kuaimai-cli/internal/skill"
 	"github.com/kuaimai-cli/kuaimai-cli/internal/upgrade"
 	"github.com/kuaimai-cli/kuaimai-cli/pkg/logger"
-	"github.com/kuaimai-cli/kuaimai-cli/shortcuts/item"
+	item "github.com/kuaimai-cli/kuaimai-cli/shortcuts/erp-item"
+	scm "github.com/kuaimai-cli/kuaimai-cli/shortcuts/scm-item"
 	"github.com/spf13/cobra"
 )
 
@@ -62,20 +63,16 @@ func resolveColor(cmd *cobra.Command) {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "kuaimai-cli",
-	Short: "快麦业务专属命令行工具",
-	Long:  "kuaimai-cli 快麦业务专属 CLI 工具，提供配置、鉴权、API 与 erp-items-core 商品快捷命令。",
-	Version: build.Version + " (" + build.Date + ")",
+	Use:           "kuaimai-cli",
+	Short:         "快麦业务专属命令行工具",
+	Long:          "kuaimai-cli 快麦业务专属 CLI 工具，提供配置、鉴权、API、ERP 商品档案与 SCM 可铺货商品快捷命令。",
+	Version:       build.Version + " (" + build.Date + ")",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
 
 // Execute runs the root command.
 func Execute() error {
-	if err := bootstrapRegistry(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		return err
-	}
 	return rootCmd.Execute()
 }
 
@@ -87,13 +84,18 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&core.Ctx.PageConfirm, "page-confirm", pagination.ConfirmPrompt, "page-all 达阈值时的确认策略: prompt|yes|no")
 	rootCmd.PersistentFlags().BoolVar(&core.Ctx.NoColor, "no-color", false, "禁用终端彩色输出")
 	rootCmd.PersistentFlags().String("output", "table", "输出格式: table|json|csv|ndjson")
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		logger.SetVerbose(core.Ctx.Verbose)
 		if core.Ctx.Verbose {
 			logger.Debug("verbose mode enabled")
 		}
 		resolveOutputFormat(cmd)
 		resolveColor(cmd)
+		if err := bootstrapRegistry(cmd); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return err
+		}
+		return nil
 	}
 	rootCmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
 		upgrade.MaybeNotify(cmd)
@@ -108,6 +110,7 @@ func init() {
 	webcmd.Register(rootCmd)
 	registrycmd.Register(rootCmd)
 	item.Register(rootCmd)
+	scm.Register(rootCmd)
 	skillcmd.Register(rootCmd)
 	completion.Register(rootCmd)
 	upgradecmd.Register(rootCmd)

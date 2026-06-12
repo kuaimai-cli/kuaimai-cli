@@ -16,12 +16,12 @@ func updateTitleCmd() *cobra.Command {
 	var title string
 	c := &cobra.Command{
 		Use:   "update-title",
-		Short: "修改商品标题（get-detail 合并后 save）",
+		Short: "修改 ERP 商品档案标题（get-detail 合并后 save）",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdateTitle(sysItemID, title)
 		},
 	}
-	c.Flags().Int64Var(&sysItemID, "sys-item-id", 0, "系统商品 ID sysItemId（必填）")
+	c.Flags().Int64Var(&sysItemID, "sys-item-id", 0, "ERP 商品档案 ID sysItemId（必填）")
 	c.Flags().StringVar(&title, "title", "", "新标题（必填）")
 	_ = c.MarkFlagRequired("sys-item-id")
 	_ = c.MarkFlagRequired("title")
