@@ -2,6 +2,19 @@
 
 本文件记录 kuaimai-cli 各版本的主要变更。
 
+## 0.2.6
+
+### Fixed
+
+- **SCM shortcut 路径修正**：`scm-item +list`、铺货、铺货日志等 SCM Web 接口统一使用 `.json` 业务接口路径，避免命中 SCM 前端页面并返回 HTML。
+- **SCM 查询参数补齐**：`scm-item +list` 补齐浏览器请求中的空数组筛选字段与 `api_name=item_base_page`，更贴近 DevTools 实际请求。
+- **Registry 单接口域名路由**：`web call` 按单个 `apis[apiId].baseUrl` 路由，避免同一 service 前缀下 ERP/SCM 接口混用目标域。
+
+### Changed
+
+- **Shortcut API 配置**：新增 `shortcuts.erp-item.api_url` 与 `shortcuts.scm-item.api_url` 默认配置，ERP/SCM curated shortcuts 不再依赖单一 `api.url`。
+- **诊断提示**：接口返回 HTML 时提示检查 `targetHost/path` 与 SCM `.json` 后缀。
+
 ## 0.2.5
 
 ### Changed

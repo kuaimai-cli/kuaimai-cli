@@ -154,7 +154,7 @@ func apiRow(meta *registry.Metadata, apiID, service string, op registry.Operatio
 		"pageable":    op.Pageable,
 		"shortcut":    shortcutForAPIID(apiID),
 	}
-	if base := strings.TrimSpace(svc.BaseURL); base != "" {
+	if base := strings.TrimSpace(svc.ResolveOperationBaseURL(op, "")); base != "" {
 		row["baseUrl"] = base
 	}
 	if op.RequestSchema != nil {

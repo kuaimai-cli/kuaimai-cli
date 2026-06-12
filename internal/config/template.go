@@ -15,6 +15,13 @@ api:
   circuit_threshold: 5
   circuit_cooldown_sec: 30
 
+# curated shortcuts 的业务目标域名；实际 HTTP 仍统一经 api.gateway_url 转发
+shortcuts:
+  erp-item:
+    api_url: "https://erp1.superboss.cc/"
+  scm-item:
+    api_url: "https://scm3.superboss.cc/"
+
 cli:
   output: "table"
   color: true

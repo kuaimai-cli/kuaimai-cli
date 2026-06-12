@@ -11,26 +11,38 @@ import (
 
 // RunGET executes a GET list/detail shortcut.
 func RunGET(path string) error {
+	return RunGETShortcut("", path)
+}
+
+// RunGETShortcut executes a GET list/detail shortcut against a configured shortcut base URL.
+func RunGETShortcut(shortcut, path string) error {
 	f, err := cmdutil.NewFactory()
 	if err != nil {
 		return err
 	}
 	return NewRunner(f).ExecuteList(context.Background(), ListOptions{
-		Method: "GET",
-		Path:   path,
+		Method:  "GET",
+		Path:    path,
+		BaseURL: f.Config.ShortcutAPIURL(shortcut),
 	})
 }
 
 // RunPOST executes a POST shortcut (JSON body when non-nil).
 func RunPOST(path string, body map[string]any) error {
+	return RunPOSTShortcut("", path, body)
+}
+
+// RunPOSTShortcut executes a JSON POST against a configured shortcut base URL.
+func RunPOSTShortcut(shortcut, path string, body map[string]any) error {
 	f, err := cmdutil.NewFactory()
 	if err != nil {
 		return err
 	}
 	return NewRunner(f).ExecuteWrite(context.Background(), WriteOptions{
-		Method: "POST",
-		Path:   path,
-		Body:   body,
+		Method:  "POST",
+		Path:    path,
+		Body:    body,
+		BaseURL: f.Config.ShortcutAPIURL(shortcut),
 	})
 }
 
@@ -54,6 +66,11 @@ func RunPOSTForm(path, bodyJSON string) error {
 
 // RunPOSTFormMap POSTs a form body map as application/x-www-form-urlencoded.
 func RunPOSTFormMap(path string, body map[string]any) error {
+	return RunPOSTFormMapShortcut("", path, body)
+}
+
+// RunPOSTFormMapShortcut POSTs a form body map against a configured shortcut base URL.
+func RunPOSTFormMapShortcut(shortcut, path string, body map[string]any) error {
 	f, err := cmdutil.NewFactory()
 	if err != nil {
 		return err
@@ -63,16 +80,22 @@ func RunPOSTFormMap(path string, body map[string]any) error {
 		Path:        path,
 		Body:        body,
 		FormEncoded: true,
+		BaseURL:     f.Config.ShortcutAPIURL(shortcut),
 	})
 }
 
 // RunPOSTFormListMap POSTs a form list endpoint; supports --page-all via pageNo/pageSize.
 func RunPOSTFormListMap(path string, body map[string]any) error {
+	return RunPOSTFormListMapShortcut("", path, body)
+}
+
+// RunPOSTFormListMapShortcut POSTs a form list endpoint against a configured shortcut base URL.
+func RunPOSTFormListMapShortcut(shortcut, path string, body map[string]any) error {
 	f, err := cmdutil.NewFactory()
 	if err != nil {
 		return err
 	}
-	return NewRunner(f).Execute(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+	return NewRunner(f).ExecuteWithBase(context.Background(), f.Config.ShortcutAPIURL(shortcut), func(ctx context.Context, c *client.Client) (any, error) {
 		var data any
 		var err error
 		if core.Ctx.PageAll {

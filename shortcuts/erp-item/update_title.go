@@ -40,7 +40,8 @@ func runUpdateTitle(sysItemID int64, newTitle string) error {
 	detailPath := common.BuildPath(getItemDetailPath, q)
 
 	var saveBody map[string]any
-	err = runner.Execute(context.Background(), func(ctx context.Context, httpClient *client.Client) (any, error) {
+	baseURL := f.Config.ShortcutAPIURL(shortcutName)
+	err = runner.ExecuteWithBase(context.Background(), baseURL, func(ctx context.Context, httpClient *client.Client) (any, error) {
 		raw, _, err := httpClient.Request(ctx, "GET", detailPath, nil)
 		if err != nil {
 			return nil, err
@@ -60,8 +61,9 @@ func runUpdateTitle(sysItemID int64, newTitle string) error {
 	}
 
 	return runner.ExecuteWrite(context.Background(), common.WriteOptions{
-		Method: "POST",
-		Path:   saveItemPath,
-		Body:   saveBody,
+		Method:  "POST",
+		Path:    saveItemPath,
+		Body:    saveBody,
+		BaseURL: baseURL,
 	})
 }

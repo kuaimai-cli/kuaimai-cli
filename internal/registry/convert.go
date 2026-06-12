@@ -79,6 +79,7 @@ func apiEntryToOperation(name string, entry APIEntry) Operation {
 		Summary:        summary,
 		Method:         strings.ToUpper(strings.TrimSpace(entry.Method)),
 		Path:           entry.Path,
+		BaseURL:        strings.TrimSpace(entry.BaseURL),
 		ContentType:    entry.ContentType,
 		Write:          entry.Write,
 		Pageable:       entry.Pageable,

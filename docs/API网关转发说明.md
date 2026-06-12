@@ -36,9 +36,11 @@ api:
 
 | 项 | 说明 |
 |----|------|
-| `api.url` | ERP 默认后端；item shortcuts、`web call item.*` 的 `targetHost` |
+| `api.url` | 默认后端兜底；原始 `api` 命令和未声明 `baseUrl` 的 registry 接口使用 |
 | `api.gateway_url` | 所有业务 HTTP 的实际请求地址 |
-| scm 域 | `web call scm.*` 的 `targetHost` 来自 registry `baseUrl`，仍经同一网关 |
+| `shortcuts.erp-item.api_url` | `erp-item` shortcut 的目标域，默认 `https://erp1.superboss.cc/` |
+| `shortcuts.scm-item.api_url` | `scm-item` shortcut 的目标域，默认 `https://scm3.superboss.cc/` |
+| registry `baseUrl` | `web call <apiId>` 的目标域；按单个 API 条目读取，业务域 `erp系统` 写入 `https://erp1.superboss.cc/`，`供应链` 写入 `https://scm3.superboss.cc/`，仍经同一网关 |
 
 ## 网关接口
 

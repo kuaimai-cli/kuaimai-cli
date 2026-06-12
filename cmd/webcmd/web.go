@@ -69,7 +69,7 @@ func runWebCall(apiID, paramsJSON, dataJSON, bodyJSON string) error {
 	if err != nil {
 		return err
 	}
-	baseURL := resolved.Svc.ResolveBaseURL(f.Config.APIURL())
+	baseURL := resolved.Svc.ResolveOperationBaseURL(resolved.Op, f.Config.APIURL())
 	r := common.NewRunner(f)
 	return apicall.Execute(context.Background(), resolved, apicall.Options{
 		BaseURL:    baseURL,
@@ -103,4 +103,3 @@ func resolveCallBody(resolved *registry.ResolvedAPI, paramsJSON, dataJSON, bodyJ
 		return "", bodyJSON, nil
 	}
 }
-

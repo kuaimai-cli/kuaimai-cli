@@ -62,6 +62,7 @@ func printFromDocument(doc *registry.DocumentV2) error {
 			"title":       entry.Title,
 			"method":      entry.Method,
 			"path":        entry.Path,
+			"baseUrl":     entry.BaseURL,
 			"contentType": entry.ContentType,
 			"write":       entry.Write,
 			"pageable":    entry.Pageable,
@@ -73,10 +74,10 @@ func printFromDocument(doc *registry.DocumentV2) error {
 	for _, name := range domainNames {
 		idx := doc.Domains[name]
 		domains = append(domains, map[string]any{
-			"domain":  name,
-			"label":   idx.Label,
-			"count":   idx.Count,
-			"apiIds":  idx.APIIDs,
+			"domain": name,
+			"label":  idx.Label,
+			"count":  idx.Count,
+			"apiIds": idx.APIIDs,
 		})
 	}
 

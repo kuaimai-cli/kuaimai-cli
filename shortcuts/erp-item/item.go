@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	shortcutName  = "erp-item"
 	stockBasePath = "/item/stock"
 	queryListPath = stockBasePath + "/queryList"
 	// QueryCountPath is POST /item/stock/queryCount (used by auth check probe).
@@ -55,7 +56,7 @@ func listCmd(shortcut bool) *cobra.Command {
 				return err
 			}
 			ApplyStockListDefaults(body)
-			return common.RunPOSTFormListMap(queryListPath, body)
+			return common.RunPOSTFormListMapShortcut(shortcutName, queryListPath, body)
 		},
 	}
 	c.Flags().StringVar(&bodyJSON, "body", defaultStockListBody, "筛选与分页 JSON（QueryItemStockListRequest，与浏览器 form 字段一致）")
@@ -73,7 +74,7 @@ func countCmd() *cobra.Command {
 				return err
 			}
 			ApplyStockListDefaults(body)
-			return common.RunPOSTFormMap(queryCountPath, body)
+			return common.RunPOSTFormMapShortcut(shortcutName, queryCountPath, body)
 		},
 	}
 	c.Flags().StringVar(&bodyJSON, "body", defaultStockListBody, "筛选条件 JSON（与 list 相同字段）")
@@ -106,7 +107,7 @@ func getDetailCmd() *cobra.Command {
 			q := url.Values{}
 			q.Set("sysItemId", strconv.FormatInt(sysItemID, 10))
 			common.SetQuery(q, "api_name", apiName)
-			return common.RunGET(common.BuildPath(getItemDetailPath, q))
+			return common.RunGETShortcut(shortcutName, common.BuildPath(getItemDetailPath, q))
 		},
 	}
 	c.Flags().Int64Var(&sysItemID, "sys-item-id", 0, "ERP 商品档案 ID sysItemId（必填）")
@@ -133,7 +134,7 @@ func saveCmd() *cobra.Command {
 			}
 			common.SetQuery(q, "api_name", apiName)
 			path := common.BuildPath(saveItemPath, q)
-			return common.RunPOST(path, body)
+			return common.RunPOSTShortcut(shortcutName, path, body)
 		},
 	}
 	c.Flags().StringVar(&bodyJSON, "body", "{}", "ERP 商品档案 JSON（SysItemModel）")

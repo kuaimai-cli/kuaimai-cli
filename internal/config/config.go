@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	fileName         = "config.yaml"
-	keyAPIURL          = "api.url"
-	keyAPIGatewayURL   = "api.gateway_url"
-	keyAPITimeout      = "api.timeout"
+	fileName                 = "config.yaml"
+	keyAPIURL                = "api.url"
+	keyAPIGatewayURL         = "api.gateway_url"
+	keyAPITimeout            = "api.timeout"
 	keyAPIRetry              = "api.retry"
 	keyAPIPoolMaxIdle        = "api.pool_max_idle"
 	keyAPIPoolMaxIdlePerHost = "api.pool_max_idle_per_host"
@@ -33,9 +33,14 @@ const (
 	defaultAPIURL        = "https://erp1.superboss.cc/"
 	defaultAPIGatewayURL = "https://open-cli.kuaimai.com"
 	defaultTimeoutSec    = 60
-	defaultCLIOutput  = "table"
-	defaultAPIRetry   = 3
+	defaultCLIOutput     = "table"
+	defaultAPIRetry      = 3
 )
+
+var defaultShortcutAPIURLs = map[string]string{
+	"erp-item": "https://erp1.superboss.cc/",
+	"scm-item": "https://scm3.superboss.cc/",
+}
 
 // Manager wraps viper for kuaimai-cli settings.
 type Manager struct {
@@ -65,6 +70,9 @@ func New() (*Manager, error) {
 	v.SetDefault(keyAuthProfile, "default")
 	v.SetDefault(keyRegistrySource, registry.DefaultRegistrySource)
 	v.SetDefault(keyRegistryAutoSync, true)
+	for shortcut, apiURL := range defaultShortcutAPIURLs {
+		v.SetDefault("shortcuts."+shortcut+".api_url", apiURL)
+	}
 	_ = v.ReadInConfig()
 	m := &Manager{v: v}
 	_ = m.ensureProfileRecord("default")
@@ -142,6 +150,22 @@ func (m *Manager) RegistrySource() string {
 // APIURL returns the configured API base URL (erp1.superboss.cc).
 func (m *Manager) APIURL() string {
 	return m.v.GetString(keyAPIURL)
+}
+
+// ShortcutAPIURL returns the service base URL for a curated shortcut.
+func (m *Manager) ShortcutAPIURL(shortcut string) string {
+	shortcut = strings.TrimSpace(shortcut)
+	if shortcut == "" {
+		return m.APIURL()
+	}
+	key := "shortcuts." + shortcut + ".api_url"
+	if u := strings.TrimSpace(m.v.GetString(key)); u != "" {
+		return u
+	}
+	if u := strings.TrimSpace(defaultShortcutAPIURLs[shortcut]); u != "" {
+		return u
+	}
+	return m.APIURL()
 }
 
 // APIGatewayURL returns the gateway base URL for API forwarding.
@@ -358,4 +382,3 @@ func (m *Manager) SetProfileAPIURL(profile, apiURL string) error {
 	m.v.Set("auth.profiles."+profile+".api_url", strings.TrimSpace(apiURL))
 	return m.Save()
 }
-

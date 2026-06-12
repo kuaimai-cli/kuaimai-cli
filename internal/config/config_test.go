@@ -23,12 +23,21 @@ func TestInitDefaults(t *testing.T) {
 	if m.APIURL() != "https://erp1.superboss.cc/" {
 		t.Fatalf("api url: %s", m.APIURL())
 	}
+	if got := m.ShortcutAPIURL("erp-item"); got != "https://erp1.superboss.cc/" {
+		t.Fatalf("erp-item api url: %s", got)
+	}
+	if got := m.ShortcutAPIURL("scm-item"); got != "https://scm3.superboss.cc/" {
+		t.Fatalf("scm-item api url: %s", got)
+	}
 }
 
 func TestInitTemplate(t *testing.T) {
 	if !containsAll(DefaultConfigTemplate,
 		"api:",
 		"url:",
+		"shortcuts:",
+		"erp-item:",
+		"scm-item:",
 		"timeout:",
 		"retry:",
 		"cli:",
@@ -39,6 +48,21 @@ func TestInitTemplate(t *testing.T) {
 	}
 	if contains(DefaultConfigTemplate, "json_suffix") {
 		t.Fatal("template must not contain json_suffix")
+	}
+}
+
+func TestShortcutAPIURLCanBeOverridden(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	m, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("shortcuts.scm-item.api_url", "https://scm3.example.test/"); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.ShortcutAPIURL("scm-item"); got != "https://scm3.example.test/" {
+		t.Fatalf("shortcut override = %q", got)
 	}
 }
 

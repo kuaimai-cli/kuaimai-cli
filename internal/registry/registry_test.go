@@ -33,6 +33,9 @@ func TestLoadFromFile(t *testing.T) {
 	if op.ContentType != ContentTypeGetQuery {
 		t.Fatalf("contentType: got %s", op.ContentType)
 	}
+	if op.BaseURL != "https://erp1.superboss.cc/" {
+		t.Fatalf("baseUrl: got %q", op.BaseURL)
+	}
 	if op.Write {
 		t.Fatal("get should be read-only")
 	}
@@ -118,6 +121,16 @@ func TestFindByAPIID(t *testing.T) {
 	}
 	if resolved.Op.Path != "/api/luotao/test/get" {
 		t.Fatalf("path: got %q", resolved.Op.Path)
+	}
+	if got := resolved.Svc.ResolveOperationBaseURL(resolved.Op, "fallback"); got != "https://erp1.superboss.cc" {
+		t.Fatalf("resolved baseUrl = %q", got)
+	}
+	post, err := meta.FindByAPIID("api.luotao.test.post")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := post.Svc.ResolveOperationBaseURL(post.Op, "fallback"); got != "https://scm3.superboss.cc" {
+		t.Fatalf("post baseUrl = %q", got)
 	}
 	if _, err := meta.FindByAPIID("missing.api"); err == nil {
 		t.Fatal("expected error for missing api")

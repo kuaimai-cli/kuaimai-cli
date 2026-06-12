@@ -7,13 +7,20 @@ import (
 )
 
 type fakeClient struct {
-	getCalls  []string
-	postCalls []string
-	postBody  map[string]any
+	getCalls   []string
+	postCalls  []string
+	postBody   map[string]any
+	postBodies map[string]map[string]any
 }
 
 func (f *fakeClient) PostJSON(ctx context.Context, path string, body any) (any, int, error) {
 	f.postCalls = append(f.postCalls, path)
+	if f.postBodies == nil {
+		f.postBodies = map[string]map[string]any{}
+	}
+	if m, ok := body.(map[string]any); ok {
+		f.postBodies[path] = m
+	}
 	if path == pathPddBatchPublish {
 		if m, ok := body.(map[string]any); ok {
 			f.postBody = m
@@ -171,6 +178,18 @@ func TestExecuteListProductsReturnsSCMItems(t *testing.T) {
 	}
 	if !containsPath(f.postCalls, pathItemBasePage) {
 		t.Fatalf("missing item query call: %#v", f.postCalls)
+	}
+	if pathItemBasePage != "/item/base/page.json" {
+		t.Fatalf("pathItemBasePage = %q", pathItemBasePage)
+	}
+	body := f.postBodies[pathItemBasePage]
+	if body["api_name"] != apiNameItemBasePage {
+		t.Fatalf("api_name = %#v", body["api_name"])
+	}
+	for _, key := range []string{"leafCategories", "cgSupplierIds", "platformItemIds", "companyNames", "shopNames"} {
+		if _, ok := body[key].([]any); !ok {
+			t.Fatalf("%s should be []any, got %#v", key, body[key])
+		}
 	}
 }
 

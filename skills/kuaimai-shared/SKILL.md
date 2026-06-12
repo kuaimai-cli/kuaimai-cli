@@ -82,15 +82,19 @@ kuaimai-cli registry watch --interval 30 --verbose
 kuaimai-cli config init
 kuaimai-cli config get --output json
 kuaimai-cli config set api.url "https://erp1.superboss.cc/"
+kuaimai-cli config set shortcuts.erp-item.api_url "https://erp1.superboss.cc/"
+kuaimai-cli config set shortcuts.scm-item.api_url "https://scm3.superboss.cc/"
 kuaimai-cli config set api.gateway_url "https://open-cli.kuaimai.com"
 ```
 
 | 项 | 说明 |
 |----|------|
 | 配置文件 | `~/.kuaimai-cli/config.yaml` |
-| 默认 API | `api.url` = `https://erp1.superboss.cc/`（逻辑目标域名 / `targetHost`） |
+| 默认 API | `api.url` = `https://erp1.superboss.cc/`（未声明目标域时的兜底 `targetHost`） |
 | API 网关 | `api.gateway_url` = `https://open-cli.kuaimai.com`（**所有业务 HTTP 实际请求地址**） |
-| scm 域 | `web call scm.*` 的 `targetHost` 来自 registry `baseUrl`（通常 `https://scm.superboss.cc/`），仍经同一网关 |
+| erp-item shortcut | `shortcuts.erp-item.api_url` = `https://erp1.superboss.cc/` |
+| scm-item shortcut | `shortcuts.scm-item.api_url` = `https://scm3.superboss.cc/` |
+| registry 域 | `web call <apiId>` 的 `targetHost` 优先来自单个 API 条目的 registry `baseUrl`；业务域 `erp系统` 为 erp1，`供应链` 为 scm3，仍经同一网关 |
 | 超时 | `api.timeout` 默认 60 秒（与网关上游超时一致） |
 
 业务请求路径：`CLI → POST {gateway_url}/api/forward → 真实后端`。Registry 同步（`registry.source`）不经网关。

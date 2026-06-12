@@ -130,19 +130,19 @@ kuaimai-cli scm-item publish-log \
 
 | 步骤 | 方法 | 路径 | 关键参数 | 说明 |
 |---|---|---|---|---|
-| 查 SCM 商品 | POST JSON | `/item/base/page` | `outerIds:[styleCode]`、`outerIdBlur:0` | `scm-item +list` 与铺货预检共用，按款式编码精确定位 SCM 商品 |
-| 查可铺货店铺 | GET query | `/shop/allShop` | `source:pdd`、`baseItemId` | `scm-item shops` 与铺货预检共用，查询该商品可用的 PDD 授权店铺 |
-| 保存临时配置 | POST JSON | `/pdd/saveBatchTempConf` | `shopType:pdd`、`shelfState`、`flowNumber` | 生成批量铺货临时配置 |
-| 查询平台资料 | POST JSON | `/pdd/queryBatchDetail` | `flowNumber`、`baseItemIds`、`shopIds` | 校验 PDD 平台资料完整性 |
-| 提交铺货 | POST JSON | `/pdd/batchPublishItem` | `shopIds`、`flowNumber`、`batchItemDetailList` | 仅 `--submit` 时调用 |
+| 查 SCM 商品 | POST JSON | `/item/base/page.json` | `outerIds:[styleCode]`、`outerIdBlur:0`、`api_name:item_base_page` | `scm-item +list` 与铺货预检共用，按款式编码精确定位 SCM 商品 |
+| 查可铺货店铺 | GET query | `/shop/allShop.json` | `source:pdd`、`baseItemId` | `scm-item shops` 与铺货预检共用，查询该商品可用的 PDD 授权店铺 |
+| 保存临时配置 | POST JSON | `/pdd/saveBatchTempConf.json` | `shopType:pdd`、`shelfState`、`flowNumber` | 生成批量铺货临时配置 |
+| 查询平台资料 | POST JSON | `/pdd/queryBatchDetail.json` | `flowNumber`、`baseItemIds`、`shopIds` | 校验 PDD 平台资料完整性 |
+| 提交铺货 | POST JSON | `/pdd/batchPublishItem.json` | `shopIds`、`flowNumber`、`batchItemDetailList` | 仅 `--submit` 时调用 |
 
 ### 日志链路
 
 | 步骤 | 方法 | 路径 | 关键参数 | 说明 |
 |---|---|---|---|---|
-| 查铺货日志 | POST JSON | `/logging/publishLog` | `startTime`、`endTime`、`pageNo`、`pageSize` | 查询铺货日志列表 |
-| 查日志明细 | GET query | `/logging/publishLogDetail` | `id=<日志行 id>` | 明细行包含 `outerId`、`status`、`errorMessage` |
-| 查日志头信息 | GET query | `/logging/publishLogById` | `id=<operationLogId>` | 补充操作日志头信息 |
+| 查铺货日志 | POST JSON | `/logging/publishLog.json` | `startTime`、`endTime`、`pageNo`、`pageSize` | 查询铺货日志列表 |
+| 查日志明细 | GET query | `/logging/publishLogDetail.json` | `id=<日志行 id>` | 明细行包含 `outerId`、`status`、`errorMessage` |
+| 查日志头信息 | GET query | `/logging/publishLogById.json` | `id=<operationLogId>` | 补充操作日志头信息 |
 
 ## Agent 调用规范
 

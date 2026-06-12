@@ -4,13 +4,13 @@
   "generatedAt": "2026-06-11T12:00:00+08:00",
   "source": "kuaimai-registry-generator",
   "domains": {
-    "商品": {
-      "label": "商品",
+    "erp系统": {
+      "label": "erp系统",
       "count": 1,
       "apiIds": ["api.luotao.test.get"]
     },
-    "其他": {
-      "label": "其他",
+    "供应链": {
+      "label": "供应链",
       "count": 1,
       "apiIds": ["api.luotao.test.post"]
     }
@@ -18,13 +18,13 @@
   "apis": {
     "api.luotao.test.get": {
       "id": "api.luotao.test.get",
-      "domain": "商品",
+      "domain": "erp系统",
       "title": "CLI自动化测试 - 查询测试数据",
       "description": "测试 GET 接口",
       "transport": "web",
       "method": "GET",
       "path": "/api/luotao/test/get",
-      "baseUrl": "",
+      "baseUrl": "https://erp1.superboss.cc/",
       "contentType": "get_query",
       "risk": "read",
       "write": false,
@@ -45,18 +45,18 @@
         }
       },
       "response": { "successPath": "suc", "listPath": "", "primaryFields": ["sysItemId"] },
-      "source": { "type": "yapi", "business_domain": "商品" },
+      "source": { "type": "yapi", "business_domain": "erp系统" },
       "examples": [{ "title": "示例", "command": "kuaimai web call api.luotao.test.get --params '{}'" }]
     },
     "api.luotao.test.post": {
       "id": "api.luotao.test.post",
-      "domain": "其他",
+      "domain": "供应链",
       "title": "CLI自动化测试 - 提交测试数据",
       "description": "测试 POST 接口",
       "transport": "web",
       "method": "POST",
       "path": "/api/luotao/test/post",
-      "baseUrl": "",
+      "baseUrl": "https://scm3.superboss.cc/",
       "contentType": "post_json",
       "risk": "read",
       "write": false,
@@ -77,7 +77,7 @@
         }
       },
       "response": { "successPath": "suc", "listPath": "", "primaryFields": ["sysItemId"] },
-      "source": { "type": "yapi", "business_domain": "其他" },
+      "source": { "type": "yapi", "business_domain": "供应链" },
       "examples": [{ "title": "示例", "command": "kuaimai web call api.luotao.test.post --data '{\"title\":\"x\"}'" }]
     }
   }

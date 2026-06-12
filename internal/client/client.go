@@ -181,7 +181,7 @@ func (c *Client) doOnce(ctx context.Context, method, pathOnly string, queryParam
 		return parsed, resp.StatusCode, &APIError{
 			Message: "接口返回了 HTML 页面（快麦通前端），不是业务 JSON",
 			Status:  resp.StatusCode,
-			Hint:    "请确认 api.url 为 https://erp1.superboss.cc/ 且路径与浏览器 DevTools 中一致",
+			Hint:    "请确认 targetHost 与路径和浏览器 DevTools 中一致；SCM 接口通常需要 .json 后缀",
 		}
 	}
 

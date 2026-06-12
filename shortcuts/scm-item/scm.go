@@ -18,19 +18,20 @@ import (
 )
 
 const (
-	scmBaseURL = "https://scm3.superboss.cc/"
+	shortcutName = "scm-item"
 
-	pathItemBasePage      = "/item/base/page"
-	pathShopAll           = "/shop/allShop"
-	pathPddSaveTempConf   = "/pdd/saveBatchTempConf"
-	pathPddQueryDetail    = "/pdd/queryBatchDetail"
-	pathPddBatchPublish   = "/pdd/batchPublishItem"
-	pathPublishLog        = "/logging/publishLog"
-	pathPublishLogDetail  = "/logging/publishLogDetail"
-	pathPublishLogByID    = "/logging/publishLogById"
+	pathItemBasePage      = "/item/base/page.json"
+	pathShopAll           = "/shop/allShop.json"
+	pathPddSaveTempConf   = "/pdd/saveBatchTempConf.json"
+	pathPddQueryDetail    = "/pdd/queryBatchDetail.json"
+	pathPddBatchPublish   = "/pdd/batchPublishItem.json"
+	pathPublishLog        = "/logging/publishLog.json"
+	pathPublishLogDetail  = "/logging/publishLogDetail.json"
+	pathPublishLogByID    = "/logging/publishLogById.json"
 	defaultPddShelfState  = 1
 	defaultPddPublishType = "PUBLISH_ITEM"
 	defaultLogPageSize    = 10
+	apiNameItemBasePage   = "item_base_page"
 )
 
 type httpClient interface {
@@ -181,7 +182,7 @@ func runPublishPDD(ctx context.Context, opts publishPDDOptions) error {
 		return err
 	}
 	r := common.NewRunner(f)
-	return r.ExecuteWithBase(ctx, scmBaseURL, func(ctx context.Context, c *client.Client) (any, error) {
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), func(ctx context.Context, c *client.Client) (any, error) {
 		return executePublishPDD(ctx, c, opts)
 	})
 }
@@ -192,7 +193,7 @@ func runListProducts(ctx context.Context, opts listProductsOptions) error {
 		return err
 	}
 	r := common.NewRunner(f)
-	return r.ExecuteWithBase(ctx, scmBaseURL, func(ctx context.Context, c *client.Client) (any, error) {
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), func(ctx context.Context, c *client.Client) (any, error) {
 		return executeListProducts(ctx, c, opts)
 	})
 }
@@ -203,7 +204,7 @@ func runShops(ctx context.Context, opts shopsOptions) error {
 		return err
 	}
 	r := common.NewRunner(f)
-	return r.ExecuteWithBase(ctx, scmBaseURL, func(ctx context.Context, c *client.Client) (any, error) {
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), func(ctx context.Context, c *client.Client) (any, error) {
 		return executeShops(ctx, c, opts)
 	})
 }
@@ -214,7 +215,7 @@ func runPublishLog(ctx context.Context, opts publishLogOptions) error {
 		return err
 	}
 	r := common.NewRunner(f)
-	return r.ExecuteWithBase(ctx, scmBaseURL, func(ctx context.Context, c *client.Client) (any, error) {
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), func(ctx context.Context, c *client.Client) (any, error) {
 		return executePublishLog(ctx, c, opts)
 	})
 }
@@ -230,8 +231,14 @@ func executeListProducts(ctx context.Context, c httpClient, opts listProductsOpt
 		opts.PageSize = 10
 	}
 	body := map[string]any{
-		"pageNo":   opts.PageNo,
-		"pageSize": opts.PageSize,
+		"pageNo":          opts.PageNo,
+		"pageSize":        opts.PageSize,
+		"leafCategories":  []any{},
+		"cgSupplierIds":   []any{},
+		"platformItemIds": []any{},
+		"companyNames":    []any{},
+		"shopNames":       []any{},
+		"api_name":        apiNameItemBasePage,
 	}
 	if styleCode := strings.TrimSpace(opts.StyleCode); styleCode != "" {
 		body["outerIds"] = []any{styleCode}
@@ -546,10 +553,16 @@ func fetchPublishLogDetail(ctx context.Context, c httpClient, record map[string]
 
 func findProductByStyleCode(ctx context.Context, c httpClient, styleCode string) (map[string]any, error) {
 	raw, _, err := c.PostJSON(ctx, pathItemBasePage, map[string]any{
-		"pageNo":      1,
-		"pageSize":    10,
-		"outerIds":    []any{styleCode},
-		"outerIdBlur": 0,
+		"pageNo":          1,
+		"pageSize":        10,
+		"leafCategories":  []any{},
+		"outerIds":        []any{styleCode},
+		"outerIdBlur":     0,
+		"cgSupplierIds":   []any{},
+		"platformItemIds": []any{},
+		"companyNames":    []any{},
+		"shopNames":       []any{},
+		"api_name":        apiNameItemBasePage,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("查询 SCM 商品失败: %w", err)

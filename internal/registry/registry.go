@@ -10,9 +10,9 @@ import (
 
 // ContentType values for request encoding.
 const (
-	ContentTypeGetQuery  = "get_query"
-	ContentTypePostForm  = "post_form"
-	ContentTypePostJSON  = "post_json"
+	ContentTypeGetQuery = "get_query"
+	ContentTypePostForm = "post_form"
+	ContentTypePostJSON = "post_json"
 )
 
 // PropertySchema describes one request/response field.
@@ -38,6 +38,7 @@ type Operation struct {
 	Summary        string      `json:"summary"`
 	Method         string      `json:"method"`
 	Path           string      `json:"path"`
+	BaseURL        string      `json:"baseUrl,omitempty"`
 	ContentType    string      `json:"contentType"`
 	Write          bool        `json:"write"`
 	Pageable       bool        `json:"pageable,omitempty"`
@@ -149,6 +150,14 @@ func (s *Service) ResolveBaseURL(fallback string) string {
 		return strings.TrimRight(u, "/")
 	}
 	return strings.TrimRight(strings.TrimSpace(fallback), "/")
+}
+
+// ResolveOperationBaseURL returns the operation base URL when set, then service base URL, then fallback.
+func (s *Service) ResolveOperationBaseURL(op Operation, fallback string) string {
+	if u := strings.TrimSpace(op.BaseURL); u != "" {
+		return strings.TrimRight(u, "/")
+	}
+	return s.ResolveBaseURL(fallback)
 }
 
 // ResolveServiceBaseURL looks up a service and returns its effective base URL.
