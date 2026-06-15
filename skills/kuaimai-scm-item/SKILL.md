@@ -30,9 +30,11 @@ ERP 商品档案 / 库存 / 改标题 / sysItemId → [`kuaimai-erp-item`](../ku
 
 | 用户需求 | 优先方式 | 说明 |
 |----------|----------|------|
-| 按款式编码定位 SCM 可铺货商品 | `scm-item +list --style-code <款式编码>` | 确认 `canPublishPlatform` 是否包含目标平台 |
-| 查询商品可铺货店铺 | `scm-item shops --platform pdd --style-code <款式编码>` | 输出 `can_publish` 与 `disabled_reason` |
-| 按款式编码把商品铺货到 PDD 店铺 | `scm-item publish-pdd` | 这是 SCM 可铺货商品，不是 ERP 商品档案 |
+| 查询 SCM 可铺货商品 | `scm-item +list [--style-code <款式编码>] [--title <关键词>]` | 分页查询；款式编码和标题均为可选过滤条件，确认 `canPublishPlatform` 是否包含目标平台 |
+| 查询商品可铺货店铺 | `scm-item shops --platform <平台key> --style-code <款式编码>` | 输出 `can_publish` 与 `disabled_reason` |
+| 按款式编码把商品铺货到指定平台店铺 | `scm-item publish --platform <平台key>` | 默认预检不提交；实际提交必须加 `--submit` |
+| PDD 兼容入口 | `scm-item publish-pdd` | 等价于 `publish --platform pdd`，保留给旧用法 |
+| 分步核对发布接口 | `scm-item platform-*` / `scm-item pdd-*` | 仅用于排查/对齐 HAR；实际铺货优先用 `publish --platform` |
 | 查询铺货日志 / 失败原因 | `scm-item publish-log --detail` | shortcut 已封装日志明细 |
 | 查询 SCM 可铺货商品列表、平台资料、分销配置等复杂条件 | `capabilities` → `schema <apiId>` → `web call` | 复杂条件看 schema |
 | 商品档案查询/列表/新增/编辑/保存/改标题 | `kuaimai-erp-item` | 不属于 SCM 可铺货商品 |
@@ -45,23 +47,49 @@ ERP 商品档案 / 库存 / 改标题 / sysItemId → [`kuaimai-erp-item`](../ku
 # 定位 SCM 可铺货商品
 kuaimai-cli scm-item +list --style-code '<款式编码>' --output json
 
-# 查询该商品可铺货的 PDD 店铺
-kuaimai-cli scm-item shops --platform pdd --style-code '<款式编码>' --output json
+# 分页浏览 SCM 可铺货商品
+kuaimai-cli scm-item +list --page 1 --page-size 10 --output json
 
-# 拼多多铺货预检：按 SCM 款式编码查询可铺货商品、店铺、平台资料完整性，但不会提交铺货任务
+# 查询该商品可铺货的目标平台店铺
+kuaimai-cli scm-item shops --platform '<平台key>' --style-code '<款式编码>' --output json
+
+# 通用铺货预检：按 SCM 款式编码查询可铺货商品、店铺、平台资料完整性，但不会提交铺货任务
+kuaimai-cli scm-item publish --platform '<平台key>' --style-code '<款式编码>' --shop '<店铺名>' --output json
+
+# PDD 兼容入口
 kuaimai-cli scm-item publish-pdd --style-code '<款式编码>' --shop '<拼多多店铺名>' --output json
 
+# 通用发布链路 primitive；platform-storage-task 默认不提交，必须加 --submit 才会提交
+kuaimai-cli scm-item platform-price-precheck --platform '<平台key>' --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item platform-sec-confirm --platform '<平台key>' --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item platform-storage-task --platform '<平台key>' --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item platform-task-speed --batch-task-id '<batchTaskId>' --output json
+
+# 分步核对 PDD 发布链路 primitive；pdd-storage-task 默认不提交，必须加 --submit 才会提交
+kuaimai-cli scm-item pdd-video-info --style-code '<款式编码>' --output json
+kuaimai-cli scm-item pdd-price-precheck --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item pdd-auth-status --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item pdd-sec-confirm --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item pdd-storage-task --style-code '<款式编码>' --shop-id 123456 --output json
+kuaimai-cli scm-item pdd-task-speed --batch-task-id '<batchTaskId>' --output json
+
 # 用户明确确认后才实际提交铺货
-kuaimai-cli scm-item publish-pdd --style-code '<款式编码>' --shop '<拼多多店铺名>' --submit --output json
+kuaimai-cli scm-item publish --platform '<平台key>' --style-code '<款式编码>' --shop '<店铺名>' --submit --output json
 
 # 提交后查询最近铺货日志和失败原因
-kuaimai-cli scm-item publish-pdd --style-code '<款式编码>' --shop '<拼多多店铺名>' --submit --check-log --output json
+kuaimai-cli scm-item publish --platform '<平台key>' --style-code '<款式编码>' --shop '<店铺名>' --submit --check-log --output json
 
 # 单独查询铺货日志明细
-kuaimai-cli scm-item publish-log --style-code '<款式编码>' --shop '<拼多多店铺名>' --detail --output json
+kuaimai-cli scm-item publish-log --style-code '<款式编码>' --shop '<店铺名>' --detail --output json
 ```
 
-`scm-item publish-pdd` 默认只停在最终 `/pdd/batchPublishItem` 前；实际提交必须带 `--submit`。`scm-item publish-log --detail` 会读取 `/logging/publishLogDetail`，失败原因看明细行 `errorMessage`。
+`scm-item publish --platform <平台key>` 默认只停在最终 `/taskScheduling/storageTask` 前；实际提交必须带 `--submit`。提交后会用 `/taskScheduling/queryTaskSpeed` 查询任务进度。`scm-item publish-log --detail` 会读取 `/logging/publishLogDetail`，失败原因看明细行 `errorMessage`。
+
+实际铺货优先使用高层 `publish --platform`，因为它在代码里串起商品、店铺、平台前置校验、提交任务和进度查询，并保留 `--submit` 安全边界。`platform-*` / `pdd-*` primitive 只用于调试、排查、核对浏览器 HAR 或需要逐步观察接口入参/出参时使用。
+
+支持平台 key：`pdd`、`tb`、`fxg`、`kuaishou`、`jd`、`1688`、`tm`、`tjb`、`yz`、`wxsph`、`wxxd`、`wd`、`xhs`、`xy`、`fxg_gx`、`yyjk`、`pddtemu`、`shein`、`ktt`、`jdms`。其中 PDD 会额外调用视频与授权校验；`tb/fxg/jd/1688` 会调用二次确认；`kuaishou` 当前按 HAR 不调用二次确认。
+
+所有 `scm-item` shortcut 的 JSON `data.interfaces[]` 会返回本次命令涉及的底层接口标识，结构为 `{name, method, path}`。常用接口名包括：`item.base.page`、`shop.allShop`、`pdd.getCarouselVideoInfo`、`ltsTask.preCheckControllerPrice`、`pdd.authorize.authStatus`、`item.base.secConfirmationItemV2`、`taskScheduling.storageTask`、`taskScheduling.queryTaskSpeed`、`logging.publishLog`、`logging.publishLogDetail`、`logging.publishLogById`。
 
 无 shortcut 的 scm-item 接口按以下流程：
 

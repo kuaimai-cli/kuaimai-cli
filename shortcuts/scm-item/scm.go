@@ -20,18 +20,34 @@ import (
 const (
 	shortcutName = "scm-item"
 
-	pathItemBasePage      = "/item/base/page.json"
-	pathShopAll           = "/shop/allShop.json"
-	pathPddSaveTempConf   = "/pdd/saveBatchTempConf.json"
-	pathPddQueryDetail    = "/pdd/queryBatchDetail.json"
-	pathPddBatchPublish   = "/pdd/batchPublishItem.json"
-	pathPublishLog        = "/logging/publishLog.json"
-	pathPublishLogDetail  = "/logging/publishLogDetail.json"
-	pathPublishLogByID    = "/logging/publishLogById.json"
-	defaultPddShelfState  = 1
-	defaultPddPublishType = "PUBLISH_ITEM"
-	defaultLogPageSize    = 10
-	apiNameItemBasePage   = "item_base_page"
+	pathItemBasePage       = "/item/base/page.json"
+	pathShopAll            = "/shop/allShop.json"
+	pathPddCarouselVideo   = "/pdd/getCarouselVideoInfo.json"
+	pathPreCheckPrice      = "/ltsTask/preCheckControllerPrice.json"
+	pathPddAuthorize       = "/pdd/authorize/authStatus.json"
+	pathSecConfirm         = "/item/base/secConfirmationItemV2.json"
+	pathStorageTask        = "/taskScheduling/storageTask.json"
+	pathQueryTaskSpeed     = "/taskScheduling/queryTaskSpeed.json"
+	pathPublishLog         = "/logging/publishLog.json"
+	pathPublishLogDetail   = "/logging/publishLogDetail.json"
+	pathPublishLogByID     = "/logging/publishLogById.json"
+	defaultShelfState      = 1
+	defaultPublishType     = "PUBLISH_ITEM"
+	defaultPublishEntrance = 0
+	defaultLogPageSize     = 10
+	apiNameItemBasePage    = "item_base_page"
+
+	interfaceItemBasePage     = "item.base.page"
+	interfaceShopAll          = "shop.allShop"
+	interfacePddCarouselVideo = "pdd.getCarouselVideoInfo"
+	interfacePreCheckPrice    = "ltsTask.preCheckControllerPrice"
+	interfacePddAuthorize     = "pdd.authorize.authStatus"
+	interfaceSecConfirm       = "item.base.secConfirmationItemV2"
+	interfaceStorageTask      = "taskScheduling.storageTask"
+	interfaceQueryTask        = "taskScheduling.queryTaskSpeed"
+	interfacePublishLog       = "logging.publishLog"
+	interfacePublishLogDetail = "logging.publishLogDetail"
+	interfacePublishLogByID   = "logging.publishLogById"
 )
 
 type httpClient interface {
@@ -40,6 +56,21 @@ type httpClient interface {
 }
 
 type publishPDDOptions struct {
+	StyleCode  string
+	Shop       string
+	ShopID     int64
+	ShelfState int
+	Submit     bool
+	CheckLog   bool
+	LogStart   string
+	LogEnd     string
+	LogPage    int
+	LogSize    int
+	Detail     bool
+}
+
+type publishPlatformOptions struct {
+	Platform   string
 	StyleCode  string
 	Shop       string
 	ShopID     int64
@@ -69,6 +100,7 @@ type shopsOptions struct {
 }
 
 type publishLogOptions struct {
+	Platform  string
 	StyleCode string
 	Shop      string
 	ShopID    int64
@@ -79,6 +111,49 @@ type publishLogOptions struct {
 	Detail    bool
 }
 
+type pddPrimitiveOptions struct {
+	StyleCode      string
+	BaseItemID     string
+	Shop           string
+	ShopID         int64
+	PlatformShopID int64
+	BatchTaskID    string
+	Submit         bool
+}
+
+type platformPrimitiveOptions struct {
+	Platform    string
+	StyleCode   string
+	BaseItemID  string
+	Shop        string
+	ShopID      int64
+	Submit      bool
+	BatchTaskID string
+}
+
+type publishTarget struct {
+	Product        map[string]any
+	Shop           map[string]any
+	BaseItemID     string
+	ShopID         int64
+	PlatformShopID int64
+	StyleCode      string
+	Platform       string
+}
+
+type platformConfig struct {
+	Key                string
+	Label              string
+	ShopSource         string
+	ShopSubSource      string
+	SecConfirmPlatform string
+	NeedsPricePrecheck bool
+	NeedsSecConfirm    bool
+	NeedsPDDVideo      bool
+	NeedsPDDAuthorize  bool
+	SubmitPath         string
+}
+
 // Register attaches SCM item shortcuts to root.
 func Register(root *cobra.Command) {
 	cmd := &cobra.Command{
@@ -87,7 +162,10 @@ func Register(root *cobra.Command) {
 	}
 	cmd.AddCommand(listProductsCmd())
 	cmd.AddCommand(shopsCmd())
+	cmd.AddCommand(publishPlatformCmd())
 	cmd.AddCommand(publishPDDCmd())
+	cmd.AddCommand(platformPrimitiveCmds()...)
+	cmd.AddCommand(pddPrimitiveCmds()...)
 	cmd.AddCommand(publishLogCmd())
 	root.AddCommand(cmd)
 }
@@ -129,6 +207,23 @@ func shopsCmd() *cobra.Command {
 	return c
 }
 
+func publishPlatformCmd() *cobra.Command {
+	var opts publishPlatformOptions
+	c := &cobra.Command{
+		Use:   "publish",
+		Short: "将 SCM 商品铺货到指定平台店铺（默认只预检，不提交）",
+		Example: `  kuaimai-cli scm-item publish --platform tb --style-code '<款式编码>' --shop '<淘宝店铺名>' --output json
+  kuaimai-cli scm-item publish --platform fxg --style-code '<款式编码>' --shop-id 123 --submit --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPublishPlatform(context.Background(), opts)
+		},
+	}
+	addPublishPlatformFlags(c, &opts)
+	_ = c.MarkFlagRequired("platform")
+	_ = c.MarkFlagRequired("style-code")
+	return c
+}
+
 func publishPDDCmd() *cobra.Command {
 	var opts publishPDDOptions
 	c := &cobra.Command{
@@ -143,8 +238,8 @@ func publishPDDCmd() *cobra.Command {
 	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（必填）")
 	c.Flags().StringVar(&opts.Shop, "shop", "", "拼多多店铺简称/名称（与 --shop-id 二选一）")
 	c.Flags().Int64Var(&opts.ShopID, "shop-id", 0, "拼多多店铺 ID（与 --shop 二选一）")
-	c.Flags().IntVar(&opts.ShelfState, "shelf-state", defaultPddShelfState, "上架设置 shelfState：1 立即上架，2 放入草稿箱")
-	c.Flags().BoolVar(&opts.Submit, "submit", false, "通过校验后实际提交 /pdd/batchPublishItem")
+	c.Flags().IntVar(&opts.ShelfState, "shelf-state", defaultShelfState, "上架设置 shelfState：1 立即上架，2 放入草稿箱")
+	c.Flags().BoolVar(&opts.Submit, "submit", false, "通过校验后实际提交 PDD 铺货任务")
 	c.Flags().BoolVar(&opts.CheckLog, "check-log", false, "提交后查询最近铺货日志与失败原因")
 	c.Flags().StringVar(&opts.LogStart, "log-start-time", "", "日志查询开始时间 yyyy-MM-dd HH:mm:ss（默认近 30 天）")
 	c.Flags().StringVar(&opts.LogEnd, "log-end-time", "", "日志查询结束时间 yyyy-MM-dd HH:mm:ss（默认当前时间）")
@@ -152,6 +247,229 @@ func publishPDDCmd() *cobra.Command {
 	c.Flags().IntVar(&opts.LogSize, "log-page-size", defaultLogPageSize, "日志查询每页条数")
 	_ = c.MarkFlagRequired("style-code")
 	return c
+}
+
+func addPublishPlatformFlags(c *cobra.Command, opts *publishPlatformOptions) {
+	c.Flags().StringVar(&opts.Platform, "platform", "", "平台 key，例如 pdd、tb、fxg、kuaishou、jd、1688、tm、yz、wxsph、wd、xhs、xy、pddtemu、shein、fxg_gx")
+	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（必填）")
+	c.Flags().StringVar(&opts.Shop, "shop", "", "店铺简称/名称（与 --shop-id 二选一）")
+	c.Flags().Int64Var(&opts.ShopID, "shop-id", 0, "店铺 ID（与 --shop 二选一）")
+	c.Flags().IntVar(&opts.ShelfState, "shelf-state", defaultShelfState, "上架设置 shelfState：1 立即上架，2 放入草稿箱")
+	c.Flags().BoolVar(&opts.Submit, "submit", false, "通过校验后实际提交铺货任务")
+	c.Flags().BoolVar(&opts.CheckLog, "check-log", false, "提交后查询最近铺货日志与失败原因")
+	c.Flags().StringVar(&opts.LogStart, "log-start-time", "", "日志查询开始时间 yyyy-MM-dd HH:mm:ss（默认近 30 天）")
+	c.Flags().StringVar(&opts.LogEnd, "log-end-time", "", "日志查询结束时间 yyyy-MM-dd HH:mm:ss（默认当前时间）")
+	c.Flags().IntVar(&opts.LogPage, "log-page", 1, "日志查询页码")
+	c.Flags().IntVar(&opts.LogSize, "log-page-size", defaultLogPageSize, "日志查询每页条数")
+}
+
+func platformPrimitiveCmds() []*cobra.Command {
+	return []*cobra.Command{
+		platformPricePrecheckCmd(),
+		platformSecConfirmCmd(),
+		platformStorageTaskCmd(),
+		platformTaskSpeedCmd(),
+	}
+}
+
+func platformPricePrecheckCmd() *cobra.Command {
+	var opts platformPrimitiveOptions
+	c := &cobra.Command{
+		Use:     "platform-price-precheck",
+		Short:   "通用底层接口：平台铺货控价预检",
+		Example: `  kuaimai-cli scm-item platform-price-precheck --platform tb --style-code '<款式编码>' --shop-id 123 --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPlatformPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePlatformPricePrecheck(ctx, c, opts)
+			})
+		},
+	}
+	addPlatformTargetFlags(c, &opts)
+	return c
+}
+
+func platformSecConfirmCmd() *cobra.Command {
+	var opts platformPrimitiveOptions
+	c := &cobra.Command{
+		Use:     "platform-sec-confirm",
+		Short:   "通用底层接口：平台铺货前二次确认",
+		Example: `  kuaimai-cli scm-item platform-sec-confirm --platform fxg --style-code '<款式编码>' --shop-id 123 --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPlatformPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePlatformSecConfirm(ctx, c, opts)
+			})
+		},
+	}
+	addPlatformTargetFlags(c, &opts)
+	return c
+}
+
+func platformStorageTaskCmd() *cobra.Command {
+	var opts platformPrimitiveOptions
+	c := &cobra.Command{
+		Use:   "platform-storage-task",
+		Short: "通用底层接口：提交平台铺货任务（默认只输出 body）",
+		Example: `  kuaimai-cli scm-item platform-storage-task --platform kuaishou --style-code '<款式编码>' --shop-id 123 --output json
+  kuaimai-cli scm-item platform-storage-task --platform kuaishou --style-code '<款式编码>' --shop-id 123 --submit --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPlatformPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePlatformStorageTask(ctx, c, opts)
+			})
+		},
+	}
+	addPlatformTargetFlags(c, &opts)
+	c.Flags().BoolVar(&opts.Submit, "submit", false, "实际调用 taskScheduling.storageTask 提交铺货任务")
+	return c
+}
+
+func platformTaskSpeedCmd() *cobra.Command {
+	var opts platformPrimitiveOptions
+	c := &cobra.Command{
+		Use:     "platform-task-speed",
+		Short:   "通用底层接口：查询平台铺货任务进度",
+		Example: `  kuaimai-cli scm-item platform-task-speed --batch-task-id '<batchTaskId>' --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPlatformPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePlatformTaskSpeed(ctx, c, opts)
+			})
+		},
+	}
+	c.Flags().StringVar(&opts.BatchTaskID, "batch-task-id", "", "taskScheduling.storageTask 返回的批次任务 ID")
+	_ = c.MarkFlagRequired("batch-task-id")
+	return c
+}
+
+func addPlatformTargetFlags(c *cobra.Command, opts *platformPrimitiveOptions) {
+	c.Flags().StringVar(&opts.Platform, "platform", "", "平台 key，例如 pdd、tb、fxg、kuaishou、fxg_gx")
+	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（与 --base-item-id 二选一）")
+	c.Flags().StringVar(&opts.BaseItemID, "base-item-id", "", "SCM 商品 baseItemId/itemId（与 --style-code 二选一）")
+	c.Flags().StringVar(&opts.Shop, "shop", "", "店铺简称/名称（与 --shop-id 二选一）")
+	c.Flags().Int64Var(&opts.ShopID, "shop-id", 0, "店铺内部 ID（shop/allShop 返回的 id）")
+	_ = c.MarkFlagRequired("platform")
+}
+
+func pddPrimitiveCmds() []*cobra.Command {
+	return []*cobra.Command{
+		pddVideoInfoCmd(),
+		pddPricePrecheckCmd(),
+		pddAuthStatusCmd(),
+		pddSecConfirmCmd(),
+		pddStorageTaskCmd(),
+		pddTaskSpeedCmd(),
+	}
+}
+
+func pddVideoInfoCmd() *cobra.Command {
+	var opts pddPrimitiveOptions
+	c := &cobra.Command{
+		Use:   "pdd-video-info",
+		Short: "PDD 底层接口：查询轮播视频信息",
+		Example: `  kuaimai-cli scm-item pdd-video-info --style-code '<款式编码>' --output json
+  kuaimai-cli scm-item pdd-video-info --base-item-id '<baseItemId>' --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPDDPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePDDVideoInfo(ctx, c, opts)
+			})
+		},
+	}
+	addPDDItemFlags(c, &opts)
+	return c
+}
+
+func pddPricePrecheckCmd() *cobra.Command {
+	var opts pddPrimitiveOptions
+	c := &cobra.Command{
+		Use:     "pdd-price-precheck",
+		Short:   "PDD 底层接口：控价预检",
+		Example: `  kuaimai-cli scm-item pdd-price-precheck --style-code '<款式编码>' --shop-id 123456 --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPDDPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePDDPricePrecheck(ctx, c, opts)
+			})
+		},
+	}
+	addPDDTargetFlags(c, &opts)
+	return c
+}
+
+func pddAuthStatusCmd() *cobra.Command {
+	var opts pddPrimitiveOptions
+	c := &cobra.Command{
+		Use:   "pdd-auth-status",
+		Short: "PDD 底层接口：授权状态校验",
+		Example: `  kuaimai-cli scm-item pdd-auth-status --platform-shop-id 849217672 --output json
+  kuaimai-cli scm-item pdd-auth-status --style-code '<款式编码>' --shop-id 123456 --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPDDPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePDDAuthStatus(ctx, c, opts)
+			})
+		},
+	}
+	c.Flags().Int64Var(&opts.PlatformShopID, "platform-shop-id", 0, "PDD 平台店铺 ID（shop/allShop 返回的 taobaoId）")
+	addPDDTargetFlags(c, &opts)
+	return c
+}
+
+func pddSecConfirmCmd() *cobra.Command {
+	var opts pddPrimitiveOptions
+	c := &cobra.Command{
+		Use:     "pdd-sec-confirm",
+		Short:   "PDD 底层接口：发布前二次确认",
+		Example: `  kuaimai-cli scm-item pdd-sec-confirm --style-code '<款式编码>' --shop-id 123456 --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPDDPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePDDSecConfirm(ctx, c, opts)
+			})
+		},
+	}
+	addPDDTargetFlags(c, &opts)
+	return c
+}
+
+func pddStorageTaskCmd() *cobra.Command {
+	var opts pddPrimitiveOptions
+	c := &cobra.Command{
+		Use:   "pdd-storage-task",
+		Short: "PDD 底层接口：提交铺货任务（默认只输出 body）",
+		Example: `  kuaimai-cli scm-item pdd-storage-task --style-code '<款式编码>' --shop-id 123456 --output json
+  kuaimai-cli scm-item pdd-storage-task --style-code '<款式编码>' --shop-id 123456 --submit --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPDDPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePDDStorageTask(ctx, c, opts)
+			})
+		},
+	}
+	addPDDTargetFlags(c, &opts)
+	c.Flags().BoolVar(&opts.Submit, "submit", false, "实际调用 taskScheduling.storageTask 提交铺货任务")
+	return c
+}
+
+func pddTaskSpeedCmd() *cobra.Command {
+	var opts pddPrimitiveOptions
+	c := &cobra.Command{
+		Use:     "pdd-task-speed",
+		Short:   "PDD 底层接口：查询铺货任务进度",
+		Example: `  kuaimai-cli scm-item pdd-task-speed --batch-task-id '<batchTaskId>' --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPDDPrimitive(context.Background(), func(ctx context.Context, c *client.Client) (any, error) {
+				return executePDDTaskSpeed(ctx, c, opts)
+			})
+		},
+	}
+	c.Flags().StringVar(&opts.BatchTaskID, "batch-task-id", "", "taskScheduling.storageTask 返回的批次任务 ID")
+	_ = c.MarkFlagRequired("batch-task-id")
+	return c
+}
+
+func addPDDItemFlags(c *cobra.Command, opts *pddPrimitiveOptions) {
+	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（与 --base-item-id 二选一）")
+	c.Flags().StringVar(&opts.BaseItemID, "base-item-id", "", "SCM 商品 baseItemId/itemId（与 --style-code 二选一）")
+}
+
+func addPDDTargetFlags(c *cobra.Command, opts *pddPrimitiveOptions) {
+	addPDDItemFlags(c, opts)
+	c.Flags().StringVar(&opts.Shop, "shop", "", "PDD 店铺简称/名称（与 --shop-id 二选一）")
+	c.Flags().Int64Var(&opts.ShopID, "shop-id", 0, "PDD 店铺内部 ID（shop/allShop 返回的 id）")
 }
 
 func publishLogCmd() *cobra.Command {
@@ -177,13 +495,30 @@ func publishLogCmd() *cobra.Command {
 }
 
 func runPublishPDD(ctx context.Context, opts publishPDDOptions) error {
+	return runPublishPlatform(ctx, publishPlatformOptions{
+		Platform:   "pdd",
+		StyleCode:  opts.StyleCode,
+		Shop:       opts.Shop,
+		ShopID:     opts.ShopID,
+		ShelfState: opts.ShelfState,
+		Submit:     opts.Submit,
+		CheckLog:   opts.CheckLog,
+		LogStart:   opts.LogStart,
+		LogEnd:     opts.LogEnd,
+		LogPage:    opts.LogPage,
+		LogSize:    opts.LogSize,
+		Detail:     opts.Detail,
+	})
+}
+
+func runPublishPlatform(ctx context.Context, opts publishPlatformOptions) error {
 	f, err := cmdutil.NewFactory()
 	if err != nil {
 		return err
 	}
 	r := common.NewRunner(f)
 	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), func(ctx context.Context, c *client.Client) (any, error) {
-		return executePublishPDD(ctx, c, opts)
+		return executePublishPlatform(ctx, c, opts)
 	})
 }
 
@@ -220,10 +555,25 @@ func runPublishLog(ctx context.Context, opts publishLogOptions) error {
 	})
 }
 
-func executeListProducts(ctx context.Context, c httpClient, opts listProductsOptions) (any, error) {
-	if strings.TrimSpace(opts.StyleCode) == "" && strings.TrimSpace(opts.Title) == "" {
-		return nil, fmt.Errorf("--style-code 与 --title 至少提供一个；复杂条件请用 capabilities/schema/web call")
+func runPDDPrimitive(ctx context.Context, fn func(context.Context, *client.Client) (any, error)) error {
+	f, err := cmdutil.NewFactory()
+	if err != nil {
+		return err
 	}
+	r := common.NewRunner(f)
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), fn)
+}
+
+func runPlatformPrimitive(ctx context.Context, fn func(context.Context, *client.Client) (any, error)) error {
+	f, err := cmdutil.NewFactory()
+	if err != nil {
+		return err
+	}
+	r := common.NewRunner(f)
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), fn)
+}
+
+func executeListProducts(ctx context.Context, c httpClient, opts listProductsOptions) (any, error) {
 	if opts.PageNo <= 0 {
 		opts.PageNo = 1
 	}
@@ -269,11 +619,218 @@ func executeListProducts(ctx context.Context, c httpClient, opts listProductsOpt
 		},
 		"records":   summaries,
 		"raw_count": len(records),
+		"interfaces": []map[string]any{
+			interfaceInfo(interfaceItemBasePage, "POST", pathItemBasePage),
+		},
 		"endpoints": []string{
 			pathItemBasePage,
 		},
 		"next": "确认商品 canPublishPlatform 包含目标平台后，可用 scm-item shops 查询可铺货店铺",
 	}, nil
+}
+
+func executePDDVideoInfo(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
+	baseItemID, product, err := resolveBaseItem(ctx, c, opts.StyleCode, opts.BaseItemID)
+	if err != nil {
+		return nil, err
+	}
+	body := map[string]any{
+		"baseItemIds": []any{baseItemID},
+		"api_name":    "pdd_getCarouselVideoInfo",
+	}
+	raw, _, err := c.PostJSON(ctx, pathPddCarouselVideo, body)
+	if err != nil {
+		return nil, fmt.Errorf("查询 PDD 轮播视频信息失败: %w", err)
+	}
+	return primitiveResult(interfacePddCarouselVideo, "POST", pathPddCarouselVideo, body, raw, map[string]any{
+		"style_code":   strings.TrimSpace(opts.StyleCode),
+		"base_item_id": baseItemID,
+		"product":      productSummary(product),
+	}), nil
+}
+
+func executePDDPricePrecheck(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
+	target, err := resolvePublishTarget(ctx, c, platformPrimitiveOptions{
+		Platform:   "pdd",
+		StyleCode:  opts.StyleCode,
+		BaseItemID: opts.BaseItemID,
+		Shop:       opts.Shop,
+		ShopID:     opts.ShopID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	body := pricePrecheckBody(target.Platform, target.BaseItemID, target.ShopID)
+	raw, _, err := c.PostJSON(ctx, pathPreCheckPrice, body)
+	if err != nil {
+		return nil, fmt.Errorf("校验 PDD 控价失败: %w", err)
+	}
+	return primitiveResult(interfacePreCheckPrice, "POST", pathPreCheckPrice, body, raw, target.Meta()), nil
+}
+
+func executePDDAuthStatus(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
+	meta := map[string]any{}
+	platformShopID := opts.PlatformShopID
+	if platformShopID == 0 {
+		target, err := resolvePublishTarget(ctx, c, platformPrimitiveOptions{
+			Platform:   "pdd",
+			StyleCode:  opts.StyleCode,
+			BaseItemID: opts.BaseItemID,
+			Shop:       opts.Shop,
+			ShopID:     opts.ShopID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		platformShopID = target.PlatformShopID
+		meta = target.Meta()
+	} else {
+		meta["platform_shop_id"] = platformShopID
+	}
+	body := map[string]any{
+		"shopIds":  []any{platformShopID},
+		"api_name": "pdd_authorize_authStatus",
+	}
+	raw, _, err := c.PostJSON(ctx, pathPddAuthorize, body)
+	if err != nil {
+		return nil, fmt.Errorf("校验 PDD 授权状态失败: %w", err)
+	}
+	return primitiveResult(interfacePddAuthorize, "POST", pathPddAuthorize, body, raw, meta), nil
+}
+
+func executePDDSecConfirm(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
+	target, err := resolvePublishTarget(ctx, c, platformPrimitiveOptions{
+		Platform:   "pdd",
+		StyleCode:  opts.StyleCode,
+		BaseItemID: opts.BaseItemID,
+		Shop:       opts.Shop,
+		ShopID:     opts.ShopID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	body := secConfirmBody(target)
+	raw, _, err := c.PostJSON(ctx, pathSecConfirm, body)
+	if err != nil {
+		return nil, fmt.Errorf("PDD 铺货二次确认失败: %w", err)
+	}
+	return primitiveResult(interfaceSecConfirm, "POST", pathSecConfirm, body, raw, target.Meta()), nil
+}
+
+func executePDDStorageTask(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
+	target, err := resolvePublishTarget(ctx, c, platformPrimitiveOptions{
+		Platform:   "pdd",
+		StyleCode:  opts.StyleCode,
+		BaseItemID: opts.BaseItemID,
+		Shop:       opts.Shop,
+		ShopID:     opts.ShopID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	body := storageTaskBody(target)
+	out := primitiveResult(interfaceStorageTask, "POST", pathStorageTask, body, nil, target.Meta())
+	out["submit"] = opts.Submit
+	if !opts.Submit {
+		out["dry_run"] = true
+		out["next"] = "如确认实际铺货，请加 --submit"
+		return out, nil
+	}
+	raw, _, err := c.PostJSON(ctx, pathStorageTask, body)
+	if err != nil {
+		return nil, fmt.Errorf("提交 PDD 铺货任务失败: %w", err)
+	}
+	out["dry_run"] = false
+	out["response"] = raw
+	out["batch_task_id"] = responseDataString(raw)
+	return out, nil
+}
+
+func executePDDTaskSpeed(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
+	batchTaskID := strings.TrimSpace(opts.BatchTaskID)
+	if batchTaskID == "" {
+		return nil, fmt.Errorf("--batch-task-id 不能为空")
+	}
+	params := map[string]any{
+		"taskTypeEnum": defaultPublishType,
+		"batchTaskId":  batchTaskID,
+		"api_name":     "taskScheduling_queryTaskSpeed",
+	}
+	raw, _, err := c.GetQuery(ctx, pathQueryTaskSpeed, params)
+	if err != nil {
+		return nil, fmt.Errorf("查询 PDD 铺货任务进度失败: %w", err)
+	}
+	return primitiveResult(interfaceQueryTask, "GET", pathQueryTaskSpeed, params, raw, map[string]any{
+		"batch_task_id": batchTaskID,
+	}), nil
+}
+
+func executePlatformPricePrecheck(ctx context.Context, c httpClient, opts platformPrimitiveOptions) (any, error) {
+	target, err := resolvePublishTarget(ctx, c, opts)
+	if err != nil {
+		return nil, err
+	}
+	body := pricePrecheckBody(target.Platform, target.BaseItemID, target.ShopID)
+	raw, _, err := c.PostJSON(ctx, pathPreCheckPrice, body)
+	if err != nil {
+		return nil, fmt.Errorf("校验 %s 控价失败: %w", target.Platform, err)
+	}
+	return primitiveResult(interfacePreCheckPrice, "POST", pathPreCheckPrice, body, raw, target.Meta()), nil
+}
+
+func executePlatformSecConfirm(ctx context.Context, c httpClient, opts platformPrimitiveOptions) (any, error) {
+	target, err := resolvePublishTarget(ctx, c, opts)
+	if err != nil {
+		return nil, err
+	}
+	body := secConfirmBody(target)
+	raw, _, err := c.PostJSON(ctx, pathSecConfirm, body)
+	if err != nil {
+		return nil, fmt.Errorf("%s 铺货二次确认失败: %w", target.Platform, err)
+	}
+	return primitiveResult(interfaceSecConfirm, "POST", pathSecConfirm, body, raw, target.Meta()), nil
+}
+
+func executePlatformStorageTask(ctx context.Context, c httpClient, opts platformPrimitiveOptions) (any, error) {
+	target, err := resolvePublishTarget(ctx, c, opts)
+	if err != nil {
+		return nil, err
+	}
+	body := storageTaskBody(target)
+	out := primitiveResult(interfaceStorageTask, "POST", pathStorageTask, body, nil, target.Meta())
+	out["submit"] = opts.Submit
+	if !opts.Submit {
+		out["dry_run"] = true
+		out["next"] = "如确认实际铺货，请加 --submit"
+		return out, nil
+	}
+	raw, _, err := c.PostJSON(ctx, pathStorageTask, body)
+	if err != nil {
+		return nil, fmt.Errorf("提交 %s 铺货任务失败: %w", target.Platform, err)
+	}
+	out["dry_run"] = false
+	out["response"] = raw
+	out["batch_task_id"] = responseDataString(raw)
+	return out, nil
+}
+
+func executePlatformTaskSpeed(ctx context.Context, c httpClient, opts platformPrimitiveOptions) (any, error) {
+	batchTaskID := strings.TrimSpace(opts.BatchTaskID)
+	if batchTaskID == "" {
+		return nil, fmt.Errorf("--batch-task-id 不能为空")
+	}
+	params := map[string]any{
+		"taskTypeEnum": defaultPublishType,
+		"batchTaskId":  batchTaskID,
+		"api_name":     "taskScheduling_queryTaskSpeed",
+	}
+	raw, _, err := c.GetQuery(ctx, pathQueryTaskSpeed, params)
+	if err != nil {
+		return nil, fmt.Errorf("查询铺货任务进度失败: %w", err)
+	}
+	return primitiveResult(interfaceQueryTask, "GET", pathQueryTaskSpeed, params, raw, map[string]any{
+		"batch_task_id": batchTaskID,
+	}), nil
 }
 
 func executeShops(ctx context.Context, c httpClient, opts shopsOptions) (any, error) {
@@ -320,6 +877,10 @@ func executeShops(ctx context.Context, c httpClient, opts shopsOptions) (any, er
 		},
 		"shops": summaries,
 		"count": len(summaries),
+		"interfaces": []map[string]any{
+			interfaceInfo(interfaceItemBasePage, "POST", pathItemBasePage),
+			interfaceInfo(interfaceShopAll, "GET", pathShopAll),
+		},
 		"endpoints": []string{
 			pathItemBasePage,
 			pathShopAll,
@@ -329,6 +890,27 @@ func executeShops(ctx context.Context, c httpClient, opts shopsOptions) (any, er
 }
 
 func executePublishPDD(ctx context.Context, c httpClient, opts publishPDDOptions) (any, error) {
+	return executePublishPlatform(ctx, c, publishPlatformOptions{
+		Platform:   "pdd",
+		StyleCode:  opts.StyleCode,
+		Shop:       opts.Shop,
+		ShopID:     opts.ShopID,
+		ShelfState: opts.ShelfState,
+		Submit:     opts.Submit,
+		CheckLog:   opts.CheckLog,
+		LogStart:   opts.LogStart,
+		LogEnd:     opts.LogEnd,
+		LogPage:    opts.LogPage,
+		LogSize:    opts.LogSize,
+		Detail:     opts.Detail,
+	})
+}
+
+func executePublishPlatform(ctx context.Context, c httpClient, opts publishPlatformOptions) (any, error) {
+	cfg, err := getPlatformConfig(opts.Platform)
+	if err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(opts.StyleCode) == "" {
 		return nil, fmt.Errorf("--style-code 不能为空")
 	}
@@ -336,88 +918,101 @@ func executePublishPDD(ctx context.Context, c httpClient, opts publishPDDOptions
 		return nil, fmt.Errorf("--shop 与 --shop-id 至少提供一个")
 	}
 	if opts.ShelfState == 0 {
-		opts.ShelfState = defaultPddShelfState
+		opts.ShelfState = defaultShelfState
 	}
 
-	product, err := findProductByStyleCode(ctx, c, opts.StyleCode)
-	if err != nil {
-		return nil, err
-	}
-	baseItemID := stringField(product, "itemId")
-	if baseItemID == "" {
-		baseItemID = stringField(product, "baseItemId")
-	}
-	if baseItemID == "" {
-		return nil, fmt.Errorf("商品 %s 缺少 baseItemId/itemId，无法铺货", opts.StyleCode)
-	}
-	if !containsString(stringListField(product, "canPublishPlatformList"), "pdd") {
-		return nil, fmt.Errorf("商品 %s 未包含 pdd 平台资料，无法铺货", opts.StyleCode)
-	}
-
-	shop, err := findPDDShop(ctx, c, baseItemID, opts)
-	if err != nil {
-		return nil, err
-	}
-	shopID, err := int64Field(shop, "id", "shopId")
-	if err != nil {
-		return nil, fmt.Errorf("店铺缺少 id/shopId: %w", err)
-	}
-	if disabledReason := shopDisabledReason(shop); disabledReason != "" {
-		return nil, fmt.Errorf("店铺 %s 当前不可铺货：%s", displayShopName(shop), disabledReason)
-	}
-
-	flowNumber := generateFlowNumber(16)
-	baseItemIDs := []any{baseItemID}
-	shopIDs := []any{shopID}
-	saveConfBody := map[string]any{
-		"shopType":   "pdd",
-		"shelfState": opts.ShelfState,
-		"flowNumber": flowNumber,
-	}
-	if _, _, err := c.PostJSON(ctx, pathPddSaveTempConf, saveConfBody); err != nil {
-		return nil, fmt.Errorf("保存 PDD 批量铺货临时配置失败: %w", err)
-	}
-
-	detailRaw, _, err := c.PostJSON(ctx, pathPddQueryDetail, map[string]any{
-		"flowNumber":  flowNumber,
-		"baseItemIds": baseItemIDs,
-		"shopIds":     shopIDs,
+	target, err := resolvePublishTarget(ctx, c, platformPrimitiveOptions{
+		Platform:  cfg.Key,
+		StyleCode: opts.StyleCode,
+		Shop:      opts.Shop,
+		ShopID:    opts.ShopID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("查询 PDD 批量铺货详情失败: %w", err)
+		return nil, err
 	}
-	detailData := dataMap(detailRaw)
-	batchList := mapList(detailData["batchDetailList"])
-	completed, incomplete := splitCompleted(batchList)
-	if len(completed) == 0 {
-		return nil, fmt.Errorf("商品 %s 的 PDD 平台资料未完善，无法铺货", opts.StyleCode)
+	canPublishKey := cfg.Key
+	if cfg.Key == "1688" {
+		canPublishKey = "1688"
 	}
-	publishDetails := formatPDDPublishDetails(completed)
-	publishBody := map[string]any{
-		"shopIds":             shopIDs,
-		"flowNumber":          flowNumber,
-		"companyId":           valueOf(detailData, product, "companyId"),
-		"isDistribution":      intFieldDefault(product, "isDistribution", 0),
-		"batchItemDetailList": publishDetails,
+	if !containsString(stringListField(target.Product, "canPublishPlatformList"), canPublishKey) {
+		return nil, fmt.Errorf("商品 %s 未包含 %s 平台资料，无法铺货", opts.StyleCode, cfg.Key)
 	}
+	interfaces := []map[string]any{
+		interfaceInfo(interfaceItemBasePage, "POST", pathItemBasePage),
+		interfaceInfo(interfaceShopAll, "GET", pathShopAll),
+	}
+	endpoints := []string{pathItemBasePage, pathShopAll}
+	var videoRaw any
+	if cfg.NeedsPDDVideo {
+		videoRaw, _, err = c.PostJSON(ctx, pathPddCarouselVideo, pddVideoInfoBody(target.BaseItemID))
+		if err != nil {
+			return nil, fmt.Errorf("查询 PDD 轮播视频信息失败: %w", err)
+		}
+		interfaces = append(interfaces, interfaceInfo(interfacePddCarouselVideo, "POST", pathPddCarouselVideo))
+		endpoints = append(endpoints, pathPddCarouselVideo)
+	}
+	var priceCheckRaw any
+	if cfg.NeedsPricePrecheck {
+		priceCheckRaw, _, err = c.PostJSON(ctx, pathPreCheckPrice, pricePrecheckBody(cfg.Key, target.BaseItemID, target.ShopID))
+		if err != nil {
+			return nil, fmt.Errorf("校验 %s 控价失败: %w", cfg.Key, err)
+		}
+		interfaces = append(interfaces, interfaceInfo(interfacePreCheckPrice, "POST", pathPreCheckPrice))
+		endpoints = append(endpoints, pathPreCheckPrice)
+	}
+	var authRaw any
+	if cfg.NeedsPDDAuthorize {
+		authRaw, _, err = c.PostJSON(ctx, pathPddAuthorize, map[string]any{
+			"shopIds":  []any{target.PlatformShopID},
+			"api_name": "pdd_authorize_authStatus",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("校验 PDD 授权状态失败: %w", err)
+		}
+		if invalid := invalidPDDAuth(dataList(authRaw)); len(invalid) > 0 {
+			return nil, fmt.Errorf("PDD 店铺授权不可用: %s", strings.Join(invalid, "；"))
+		}
+		interfaces = append(interfaces, interfaceInfo(interfacePddAuthorize, "POST", pathPddAuthorize))
+		endpoints = append(endpoints, pathPddAuthorize)
+	}
+	var secConfirmRaw any
+	if cfg.NeedsSecConfirm {
+		secConfirmRaw, _, err = c.PostJSON(ctx, pathSecConfirm, secConfirmBody(target))
+		if err != nil {
+			return nil, fmt.Errorf("%s 铺货二次确认失败: %w", cfg.Key, err)
+		}
+		if rows := dataList(secConfirmRaw); secConfirmHasBlockingRows(rows) {
+			return nil, fmt.Errorf("%s 铺货二次确认未通过: %s", cfg.Key, compactJSON(rows))
+		}
+		interfaces = append(interfaces, interfaceInfo(interfaceSecConfirm, "POST", pathSecConfirm))
+		endpoints = append(endpoints, pathSecConfirm)
+	}
+	publishBody := storageTaskBody(target)
+	interfaces = append(interfaces, interfaceInfo(interfaceStorageTask, "POST", pathStorageTask))
+	endpoints = append(endpoints, pathStorageTask)
 
 	plan := map[string]any{
-		"platform":         "pdd",
-		"submit":           opts.Submit,
-		"style_code":       opts.StyleCode,
-		"product":          productSummary(product),
-		"shop":             shopSummary(shop),
-		"flow_number":      flowNumber,
-		"completed_count":  len(completed),
-		"incomplete_count": len(incomplete),
-		"endpoints": []string{
-			pathItemBasePage,
-			pathShopAll,
-			pathPddSaveTempConf,
-			pathPddQueryDetail,
-			pathPddBatchPublish,
-		},
-		"publish_body": publishBody,
+		"platform":      cfg.Key,
+		"platform_name": cfg.Label,
+		"submit":        opts.Submit,
+		"style_code":    opts.StyleCode,
+		"product":       productSummary(target.Product),
+		"shop":          shopSummary(target.Shop),
+		"publish_body":  publishBody,
+		"interfaces":    interfaces,
+		"endpoints":     endpoints,
+	}
+	if videoRaw != nil {
+		plan["video_info"] = dataList(videoRaw)
+	}
+	if priceCheckRaw != nil {
+		plan["precheck"] = dataMap(priceCheckRaw)
+	}
+	if authRaw != nil {
+		plan["auth_status"] = dataList(authRaw)
+	}
+	if secConfirmRaw != nil {
+		plan["sec_confirm"] = dataList(secConfirmRaw)
 	}
 	if !opts.Submit {
 		plan["dry_run"] = true
@@ -425,17 +1020,30 @@ func executePublishPDD(ctx context.Context, c httpClient, opts publishPDDOptions
 		return plan, nil
 	}
 
-	res, _, err := c.PostJSON(ctx, pathPddBatchPublish, publishBody)
+	res, _, err := c.PostJSON(ctx, pathStorageTask, publishBody)
 	if err != nil {
-		return nil, fmt.Errorf("提交 PDD 铺货任务失败: %w", err)
+		return nil, fmt.Errorf("提交 %s 铺货任务失败: %w", cfg.Key, err)
 	}
+	batchTaskID := responseDataString(res)
 	plan["dry_run"] = false
 	plan["publish_result"] = res
+	plan["batch_task_id"] = batchTaskID
+	if batchTaskID != "" {
+		progress, err := queryTaskSpeed(ctx, c, batchTaskID, 6)
+		if err != nil {
+			plan["progress_error"] = err.Error()
+		} else {
+			plan["progress"] = progress
+		}
+		plan["interfaces"] = append(plan["interfaces"].([]map[string]any), interfaceInfo(interfaceQueryTask, "GET", pathQueryTaskSpeed))
+		plan["endpoints"] = append(plan["endpoints"].([]string), pathQueryTaskSpeed)
+	}
 	if opts.CheckLog {
 		logs, err := queryPublishLogs(ctx, c, publishLogOptions{
+			Platform:  cfg.Key,
 			StyleCode: opts.StyleCode,
-			Shop:      displayShopName(shop),
-			ShopID:    shopID,
+			Shop:      displayShopName(target.Shop),
+			ShopID:    target.ShopID,
 			StartTime: opts.LogStart,
 			EndTime:   opts.LogEnd,
 			PageNo:    opts.LogPage,
@@ -482,7 +1090,7 @@ func queryPublishLogs(ctx context.Context, c httpClient, opts publishLogOptions)
 	records := extractRecords(data)
 	matches := filterPublishLogRecords(records, opts)
 	out := map[string]any{
-		"platform":   "pdd",
+		"platform":   defaultString(strings.TrimSpace(opts.Platform), "pdd"),
 		"style_code": strings.TrimSpace(opts.StyleCode),
 		"shop":       strings.TrimSpace(opts.Shop),
 		"shop_id":    opts.ShopID,
@@ -496,6 +1104,9 @@ func queryPublishLogs(ctx context.Context, c httpClient, opts publishLogOptions)
 			"total":    data["total"],
 		},
 		"records": matches,
+		"interfaces": []map[string]any{
+			interfaceInfo(interfacePublishLog, "POST", pathPublishLog),
+		},
 		"endpoints": []string{
 			pathPublishLog,
 		},
@@ -513,6 +1124,11 @@ func queryPublishLogs(ctx context.Context, c httpClient, opts publishLogOptions)
 			details = append(details, detail)
 		}
 		out["details"] = details
+		out["interfaces"] = []map[string]any{
+			interfaceInfo(interfacePublishLog, "POST", pathPublishLog),
+			interfaceInfo(interfacePublishLogDetail, "GET", pathPublishLogDetail),
+			interfaceInfo(interfacePublishLogByID, "GET", pathPublishLogByID),
+		}
 		out["endpoints"] = []string{
 			pathPublishLog,
 			pathPublishLogDetail,
@@ -520,6 +1136,184 @@ func queryPublishLogs(ctx context.Context, c httpClient, opts publishLogOptions)
 		}
 	}
 	return out, nil
+}
+
+func queryTaskSpeed(ctx context.Context, c httpClient, batchTaskID string, maxPolls int) ([]map[string]any, error) {
+	if maxPolls <= 0 {
+		maxPolls = 1
+	}
+	out := make([]map[string]any, 0, maxPolls)
+	for i := 0; i < maxPolls; i++ {
+		raw, _, err := c.GetQuery(ctx, pathQueryTaskSpeed, map[string]any{
+			"taskTypeEnum": defaultPublishType,
+			"batchTaskId":  batchTaskID,
+			"api_name":     "taskScheduling_queryTaskSpeed",
+		})
+		if err != nil {
+			return out, fmt.Errorf("查询 PDD 铺货任务进度失败: %w", err)
+		}
+		data := dataMap(raw)
+		out = append(out, data)
+		if b, ok := boolField(data, "finished"); ok && b {
+			break
+		}
+	}
+	return out, nil
+}
+
+func resolveBaseItem(ctx context.Context, c httpClient, styleCode, inputBaseItemID string) (string, map[string]any, error) {
+	baseItemID := strings.TrimSpace(inputBaseItemID)
+	if baseItemID != "" {
+		return baseItemID, map[string]any{}, nil
+	}
+	styleCode = strings.TrimSpace(styleCode)
+	if styleCode == "" {
+		return "", nil, fmt.Errorf("--style-code 与 --base-item-id 至少提供一个")
+	}
+	product, err := findProductByStyleCode(ctx, c, styleCode)
+	if err != nil {
+		return "", nil, err
+	}
+	baseItemID = stringField(product, "itemId")
+	if baseItemID == "" {
+		baseItemID = stringField(product, "baseItemId")
+	}
+	if baseItemID == "" {
+		return "", nil, fmt.Errorf("商品 %s 缺少 baseItemId/itemId", styleCode)
+	}
+	return baseItemID, product, nil
+}
+
+func resolvePublishTarget(ctx context.Context, c httpClient, opts platformPrimitiveOptions) (publishTarget, error) {
+	cfg, err := getPlatformConfig(opts.Platform)
+	if err != nil {
+		return publishTarget{}, err
+	}
+	baseItemID, product, err := resolveBaseItem(ctx, c, opts.StyleCode, opts.BaseItemID)
+	if err != nil {
+		return publishTarget{}, err
+	}
+	if strings.TrimSpace(opts.Shop) == "" && opts.ShopID == 0 {
+		return publishTarget{}, fmt.Errorf("--shop 与 --shop-id 至少提供一个")
+	}
+	shop, err := findPlatformShop(ctx, c, cfg, baseItemID, opts.Shop, opts.ShopID)
+	if err != nil {
+		return publishTarget{}, err
+	}
+	shopID, err := int64Field(shop, "id", "shopId")
+	if err != nil {
+		return publishTarget{}, fmt.Errorf("店铺缺少 id/shopId: %w", err)
+	}
+	if disabledReason := shopDisabledReason(shop); disabledReason != "" {
+		return publishTarget{}, fmt.Errorf("店铺 %s 当前不可铺货：%s", displayShopName(shop), disabledReason)
+	}
+	platformShopID := int64(0)
+	if cfg.NeedsPDDAuthorize {
+		platformShopID, err = int64Field(shop, "taobaoId", "platformShopId")
+		if err != nil {
+			return publishTarget{}, fmt.Errorf("店铺缺少 taobaoId/platformShopId，无法校验 PDD 授权: %w", err)
+		}
+	}
+	return publishTarget{
+		Product:        product,
+		Shop:           shop,
+		BaseItemID:     baseItemID,
+		ShopID:         shopID,
+		PlatformShopID: platformShopID,
+		StyleCode:      strings.TrimSpace(opts.StyleCode),
+		Platform:       cfg.Key,
+	}, nil
+}
+
+func (t publishTarget) Meta() map[string]any {
+	return map[string]any{
+		"platform":         t.Platform,
+		"style_code":       t.StyleCode,
+		"base_item_id":     t.BaseItemID,
+		"shop_id":          t.ShopID,
+		"platform_shop_id": t.PlatformShopID,
+		"product":          productSummary(t.Product),
+		"shop":             shopSummary(t.Shop),
+	}
+}
+
+func pddVideoInfoBody(baseItemID string) map[string]any {
+	return map[string]any{
+		"baseItemIds": []any{baseItemID},
+		"api_name":    "pdd_getCarouselVideoInfo",
+	}
+}
+
+func pricePrecheckBody(platform, baseItemID string, shopID int64) map[string]any {
+	return map[string]any{
+		"itemId":       baseItemID,
+		"shopIds":      []any{shopID},
+		"platformType": platform,
+		"api_name":     "ltsTask_preCheckControllerPrice",
+	}
+}
+
+func secConfirmBody(target publishTarget) map[string]any {
+	platform := target.Platform
+	if platform == "1688" {
+		platform = "a1688"
+	}
+	return map[string]any{
+		"platformType": platform,
+		"itemShopList": []map[string]any{
+			{
+				"baseItemId": target.BaseItemID,
+				"shops": []map[string]any{
+					{
+						"shopId":  target.ShopID,
+						"channel": "",
+					},
+				},
+				"outId": stringField(target.Product, "outerId"),
+			},
+		},
+		"api_name": "item_base_secConfirmationItemV2",
+	}
+}
+
+func storageTaskBody(target publishTarget) map[string]any {
+	return map[string]any{
+		"itemIds":                []any{target.BaseItemID},
+		"shopIds":                []any{target.ShopID},
+		"taskEntrance":           defaultPublishEntrance,
+		"taskType":               defaultPublishType,
+		"channel":                "",
+		"batchOperationEntrance": 0,
+		"isDistribution":         intFieldDefault(target.Product, "isDistribution", 0),
+		"api_name":               "taskScheduling_storageTask",
+	}
+}
+
+func primitiveResult(name, method, path string, request, response any, meta map[string]any) map[string]any {
+	out := map[string]any{
+		"interface": interfaceInfo(name, method, path),
+		"interfaces": []map[string]any{
+			interfaceInfo(name, method, path),
+		},
+		"endpoint": path,
+		"endpoints": []string{
+			path,
+		},
+		"request":  request,
+		"response": response,
+	}
+	for k, v := range meta {
+		out[k] = v
+	}
+	return out
+}
+
+func interfaceInfo(name, method, path string) map[string]any {
+	return map[string]any{
+		"name":   name,
+		"method": method,
+		"path":   path,
+	}
 }
 
 func fetchPublishLogDetail(ctx context.Context, c httpClient, record map[string]any, opts publishLogOptions) (map[string]any, error) {
@@ -584,9 +1378,15 @@ func findProductByStyleCode(ctx context.Context, c httpClient, styleCode string)
 }
 
 func queryShops(ctx context.Context, c httpClient, platform, baseItemID string) ([]map[string]any, error) {
+	cfg, err := getPlatformConfig(platform)
+	if err != nil {
+		return nil, err
+	}
+	source := cfg.ShopSource
+	subSource := cfg.ShopSubSource
 	raw, _, err := c.GetQuery(ctx, pathShopAll, map[string]any{
-		"source":     platform,
-		"subSource":  "",
+		"source":     source,
+		"subSource":  subSource,
 		"baseItemId": baseItemID,
 		"channel":    "",
 	})
@@ -600,22 +1400,22 @@ func queryShops(ctx context.Context, c httpClient, platform, baseItemID string) 
 	return shops, nil
 }
 
-func findPDDShop(ctx context.Context, c httpClient, baseItemID string, opts publishPDDOptions) (map[string]any, error) {
-	shops, err := queryShops(ctx, c, "pdd", baseItemID)
+func findPlatformShop(ctx context.Context, c httpClient, cfg platformConfig, baseItemID, shopName string, shopID int64) (map[string]any, error) {
+	shops, err := queryShops(ctx, c, cfg.Key, baseItemID)
 	if err != nil {
 		return nil, err
 	}
-	if opts.ShopID != 0 {
+	if shopID != 0 {
 		for _, shop := range shops {
 			id, _ := int64Field(shop, "id", "shopId")
-			if id == opts.ShopID {
+			if id == shopID {
 				return shop, nil
 			}
 		}
-		return nil, fmt.Errorf("未找到 shopId=%d 的 PDD 店铺", opts.ShopID)
+		return nil, fmt.Errorf("未找到 shopId=%d 的 %s 店铺", shopID, cfg.Key)
 	}
 
-	keyword := strings.TrimSpace(opts.Shop)
+	keyword := strings.TrimSpace(shopName)
 	exact := make([]map[string]any, 0, 1)
 	fuzzy := make([]map[string]any, 0, 1)
 	for _, shop := range shops {
@@ -639,7 +1439,44 @@ func findPDDShop(ctx context.Context, c httpClient, baseItemID string, opts publ
 	if len(fuzzy) > 1 {
 		return nil, fmt.Errorf("店铺 %s 模糊匹配到 %d 个结果，请改用 --shop-id", keyword, len(fuzzy))
 	}
-	return nil, fmt.Errorf("未找到 PDD 店铺 %s", keyword)
+	return nil, fmt.Errorf("未找到 %s 店铺 %s", cfg.Key, keyword)
+}
+
+func getPlatformConfig(platform string) (platformConfig, error) {
+	key := strings.TrimSpace(platform)
+	if key == "" {
+		return platformConfig{}, fmt.Errorf("--platform 不能为空")
+	}
+	cfgs := map[string]platformConfig{
+		"pdd":      {Key: "pdd", Label: "拼多多", ShopSource: "pdd", NeedsPricePrecheck: true, NeedsSecConfirm: true, NeedsPDDVideo: true, NeedsPDDAuthorize: true},
+		"tb":       {Key: "tb", Label: "淘宝", ShopSource: "tb", NeedsPricePrecheck: true, NeedsSecConfirm: true},
+		"fxg":      {Key: "fxg", Label: "抖音", ShopSource: "fxg", NeedsPricePrecheck: true, NeedsSecConfirm: true},
+		"kuaishou": {Key: "kuaishou", Label: "快手", ShopSource: "kuaishou", NeedsPricePrecheck: true},
+		"jd":       {Key: "jd", Label: "京东", ShopSource: "jd", NeedsPricePrecheck: true, NeedsSecConfirm: true},
+		"1688":     {Key: "1688", Label: "阿里巴巴", ShopSource: "1688", SecConfirmPlatform: "a1688", NeedsPricePrecheck: true, NeedsSecConfirm: true},
+		"tm":       {Key: "tm", Label: "天猫", ShopSource: "tm", NeedsPricePrecheck: true},
+		"tjb":      {Key: "tjb", Label: "淘特", ShopSource: "tb", ShopSubSource: "tjb", NeedsPricePrecheck: true},
+		"yz":       {Key: "yz", Label: "有赞", ShopSource: "yz", NeedsPricePrecheck: true},
+		"wxsph":    {Key: "wxsph", Label: "微信小店（视频号）", ShopSource: "wxsph", NeedsPricePrecheck: true},
+		"wxxd":     {Key: "wxxd", Label: "微信小店", ShopSource: "wxxd", NeedsPricePrecheck: true},
+		"wd":       {Key: "wd", Label: "微店", ShopSource: "wd", NeedsPricePrecheck: true},
+		"xhs":      {Key: "xhs", Label: "小红书", ShopSource: "xhs", NeedsPricePrecheck: true},
+		"xy":       {Key: "xy", Label: "闲鱼", ShopSource: "xy", NeedsPricePrecheck: true},
+		"fxg_gx":   {Key: "fxg_gx", Label: "抖音供销平台", ShopSource: "fxg_gx", NeedsPricePrecheck: true},
+		"yyjk":     {Key: "yyjk", Label: "美团闪购平台", ShopSource: "yyjk", NeedsPricePrecheck: true},
+		"pddtemu":  {Key: "pddtemu", Label: "Temu", ShopSource: "pddtemu", NeedsPricePrecheck: true},
+		"shein":    {Key: "shein", Label: "Shein", ShopSource: "shein", NeedsPricePrecheck: true},
+		"ktt":      {Key: "ktt", Label: "快团团", ShopSource: "ktt"},
+		"jdms":     {Key: "jdms", Label: "京东到家", ShopSource: "jdms"},
+	}
+	cfg, ok := cfgs[key]
+	if !ok {
+		return platformConfig{}, fmt.Errorf("暂不支持平台 %s", key)
+	}
+	if cfg.SecConfirmPlatform == "" {
+		cfg.SecConfirmPlatform = cfg.Key
+	}
+	return cfg, nil
 }
 
 func filterShops(shops []map[string]any, opts shopsOptions) []map[string]any {
@@ -668,19 +1505,6 @@ func filterShops(shops []map[string]any, opts shopsOptions) []map[string]any {
 	return out
 }
 
-func splitCompleted(items []map[string]any) ([]map[string]any, []map[string]any) {
-	completed := make([]map[string]any, 0, len(items))
-	incomplete := make([]map[string]any, 0)
-	for _, item := range items {
-		if intFieldDefault(item, "informationLack", 0) == 1 {
-			completed = append(completed, item)
-		} else {
-			incomplete = append(incomplete, item)
-		}
-	}
-	return completed, incomplete
-}
-
 func normalizeLogRange(start, end string) (string, string) {
 	const layout = "2006-01-02 15:04:05"
 	now := time.Now()
@@ -707,7 +1531,7 @@ func extractRecords(data map[string]any) []map[string]any {
 func filterPublishLogRecords(records []map[string]any, opts publishLogOptions) []map[string]any {
 	out := make([]map[string]any, 0, len(records))
 	for _, record := range records {
-		if !recordLooksLikePDD(record) {
+		if !recordLooksLikePlatform(record, opts.Platform) {
 			continue
 		}
 		if opts.ShopID != 0 {
@@ -742,7 +1566,11 @@ func filterPublishLogDetailRows(rows []map[string]any, opts publishLogOptions) [
 	return out
 }
 
-func recordLooksLikePDD(record map[string]any) bool {
+func recordLooksLikePlatform(record map[string]any, platform string) bool {
+	platform = strings.TrimSpace(platform)
+	if platform == "" {
+		platform = "pdd"
+	}
 	seenPlatform := false
 	for _, key := range []string{"platformType", "platform", "source", "shopType"} {
 		value := stringField(record, key)
@@ -750,15 +1578,37 @@ func recordLooksLikePDD(record map[string]any) bool {
 			continue
 		}
 		seenPlatform = true
-		if strings.EqualFold(value, "pdd") {
+		if strings.EqualFold(value, platform) {
 			return true
 		}
 	}
 	// Older log rows may omit platform in the list but still contain PDD shop fields.
-	if stringField(record, "pddGoodsId", "pddProductId") != "" {
+	if platform == "pdd" && stringField(record, "pddGoodsId", "pddProductId") != "" {
 		return true
 	}
 	return !seenPlatform
+}
+
+func secConfirmHasBlockingRows(rows []map[string]any) bool {
+	for _, row := range rows {
+		if b, ok := boolField(row, "finished"); ok && !b {
+			return true
+		}
+		if failMsgs := anyList(row["failMsg"]); len(failMsgs) > 0 {
+			return true
+		}
+		if items := mapList(row["itemShopList"]); len(items) > 0 {
+			for _, item := range items {
+				if b, ok := boolField(item, "checkResult"); ok && !b {
+					return true
+				}
+			}
+		}
+		if capacity := mapList(row["capacityList"]); len(capacity) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func recordMatchesShop(record map[string]any, shop string) bool {
@@ -812,37 +1662,6 @@ func summarizeLogRows(rows []map[string]any) map[string]any {
 	return summary
 }
 
-func formatPDDPublishDetails(items []map[string]any) []map[string]any {
-	out := make([]map[string]any, 0, len(items))
-	for _, item := range items {
-		cp := cloneMap(item)
-		if v, ok := cp["shopBrandConf"]; ok && v != nil {
-			switch vv := v.(type) {
-			case string:
-				cp["shopBrandConf"] = vv
-			default:
-				b, err := json.Marshal(vv)
-				if err == nil {
-					cp["shopBrandConf"] = string(b)
-				}
-			}
-		} else {
-			cp["shopBrandConf"] = nil
-		}
-		if skuList := mapList(cp["skuDetailList"]); len(skuList) > 0 {
-			next := make([]map[string]any, 0, len(skuList))
-			for _, sku := range skuList {
-				s := cloneMap(sku)
-				delete(s, "skuSpecifications")
-				next = append(next, s)
-			}
-			cp["skuDetailList"] = next
-		}
-		out = append(out, cp)
-	}
-	return out
-}
-
 func shopDisabledReason(shop map[string]any) string {
 	if s := stringField(shop, "abnormalState"); s != "" {
 		return "店铺异常: " + s
@@ -878,6 +1697,27 @@ func dataMap(raw any) map[string]any {
 	return map[string]any{}
 }
 
+func dataList(raw any) []map[string]any {
+	if m, ok := raw.(map[string]any); ok {
+		return mapList(m["data"])
+	}
+	return mapList(raw)
+}
+
+func asMap(raw any) map[string]any {
+	if m, ok := raw.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
+
+func responseDataString(raw any) string {
+	if value := stringField(dataMap(raw), "data"); value != "" {
+		return value
+	}
+	return stringField(asMap(raw), "data")
+}
+
 func mapList(v any) []map[string]any {
 	switch list := v.(type) {
 	case []map[string]any:
@@ -895,12 +1735,65 @@ func mapList(v any) []map[string]any {
 	}
 }
 
+func anyList(v any) []any {
+	switch list := v.(type) {
+	case []any:
+		return list
+	case []string:
+		out := make([]any, 0, len(list))
+		for _, item := range list {
+			out = append(out, item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]any, 0, len(list))
+		for _, item := range list {
+			out = append(out, item)
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func defaultString(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
 func cloneMap(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))
 	for k, v := range m {
 		out[k] = v
 	}
 	return out
+}
+
+func invalidPDDAuth(rows []map[string]any) []string {
+	out := make([]string, 0)
+	for _, row := range rows {
+		authorizeValid, hasAuthorizeValid := boolField(row, "authorizeValid")
+		tokenValid, hasTokenValid := boolField(row, "tokenValid")
+		if (!hasAuthorizeValid || authorizeValid) && (!hasTokenValid || tokenValid) {
+			continue
+		}
+		shopID := stringField(row, "shopId")
+		if shopID == "" {
+			shopID = "unknown"
+		}
+		out = append(out, fmt.Sprintf("shopId=%s authorizeValid=%v tokenValid=%v", shopID, authorizeValid, tokenValid))
+	}
+	return out
+}
+
+func compactJSON(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprint(v)
+	}
+	return string(b)
 }
 
 func stringField(m map[string]any, keys ...string) string {

@@ -21,7 +21,7 @@ func (f *fakeClient) PostJSON(ctx context.Context, path string, body any) (any, 
 	if m, ok := body.(map[string]any); ok {
 		f.postBodies[path] = m
 	}
-	if path == pathPddBatchPublish {
+	if path == pathStorageTask {
 		if m, ok := body.(map[string]any); ok {
 			f.postBody = m
 		}
@@ -44,24 +44,29 @@ func (f *fakeClient) PostJSON(ctx context.Context, path string, body any) (any, 
 				},
 			},
 		}, 200, nil
-	case pathPddSaveTempConf:
+	case pathPddCarouselVideo:
 		return map[string]any{"result": float64(1)}, 200, nil
-	case pathPddQueryDetail:
+	case pathPreCheckPrice:
 		return map[string]any{
 			"result": float64(1),
 			"data": map[string]any{
-				"batchDetailList": []any{
-					map[string]any{
-						"baseItemId":       "92ee1d081c7d000",
-						"informationLack":  float64(1),
-						"name":             "测试商品",
-						"shopBrandConf":    []any{map[string]any{"shopId": float64(123), "vvalue": "品牌"}},
-						"skuDetailList":    []any{map[string]any{"skuId": "sku-1", "skuSpecifications": []any{"drop"}}},
-						"batchFissionConf": nil,
-					},
+				"isLimit":        float64(0),
+				"isDistribution": float64(0),
+			},
+		}, 200, nil
+	case pathPddAuthorize:
+		return map[string]any{
+			"result": float64(1),
+			"data": []any{
+				map[string]any{
+					"shopId":         "849217672",
+					"authorizeValid": true,
+					"tokenValid":     true,
 				},
 			},
 		}, 200, nil
+	case pathSecConfirm:
+		return map[string]any{"result": float64(1), "data": []any{}}, 200, nil
 	case pathPublishLog:
 		return map[string]any{
 			"result": float64(1),
@@ -94,11 +99,24 @@ func (f *fakeClient) GetQuery(ctx context.Context, path string, params map[strin
 					map[string]any{
 						"id":       float64(123),
 						"shopId":   float64(123),
+						"taobaoId": float64(849217672),
 						"title":    "zhengweihao",
 						"source":   "pdd",
 						"state":    float64(2),
 						"deadline": "",
 					},
+				},
+			},
+		}, 200, nil
+	case pathQueryTaskSpeed:
+		return map[string]any{
+			"result": float64(1),
+			"data": map[string]any{
+				"finished": true,
+				"result": map[string]any{
+					"total":   float64(1),
+					"success": float64(1),
+					"failure": float64(0),
 				},
 			},
 		}, 200, nil
@@ -142,20 +160,21 @@ func TestExecutePublishPDDPlansWithoutSubmit(t *testing.T) {
 	if plan["dry_run"] != true {
 		t.Fatalf("dry_run = %v, want true", plan["dry_run"])
 	}
-	if containsPath(f.postCalls, pathPddBatchPublish) {
+	if containsPath(f.postCalls, pathStorageTask) {
 		t.Fatalf("unexpected submit call: %#v", f.postCalls)
 	}
 	body := plan["publish_body"].(map[string]any)
 	if !reflect.DeepEqual(body["shopIds"], []any{int64(123)}) {
 		t.Fatalf("shopIds = %#v", body["shopIds"])
 	}
-	details := body["batchItemDetailList"].([]map[string]any)
-	skus := details[0]["skuDetailList"].([]map[string]any)
-	if _, ok := skus[0]["skuSpecifications"]; ok {
-		t.Fatal("skuSpecifications should be removed for pdd publish")
+	if body["taskType"] != defaultPublishType {
+		t.Fatalf("taskType = %#v", body["taskType"])
 	}
-	if _, ok := details[0]["shopBrandConf"].(string); !ok {
-		t.Fatalf("shopBrandConf should be serialized, got %#v", details[0]["shopBrandConf"])
+	if body["api_name"] != "taskScheduling_storageTask" {
+		t.Fatalf("api_name = %#v", body["api_name"])
+	}
+	if !containsInterface(plan, interfaceStorageTask) {
+		t.Fatalf("missing interface %s: %#v", interfaceStorageTask, plan["interfaces"])
 	}
 }
 
@@ -179,6 +198,9 @@ func TestExecuteListProductsReturnsSCMItems(t *testing.T) {
 	if !containsPath(f.postCalls, pathItemBasePage) {
 		t.Fatalf("missing item query call: %#v", f.postCalls)
 	}
+	if !containsInterface(out, interfaceItemBasePage) {
+		t.Fatalf("missing interface %s: %#v", interfaceItemBasePage, out["interfaces"])
+	}
 	if pathItemBasePage != "/item/base/page.json" {
 		t.Fatalf("pathItemBasePage = %q", pathItemBasePage)
 	}
@@ -190,6 +212,28 @@ func TestExecuteListProductsReturnsSCMItems(t *testing.T) {
 		if _, ok := body[key].([]any); !ok {
 			t.Fatalf("%s should be []any, got %#v", key, body[key])
 		}
+	}
+}
+
+func TestExecuteListProductsAllowsNoFilter(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executeListProducts(context.Background(), f, listProductsOptions{
+		PageNo:   1,
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := got.(map[string]any)
+	if !containsInterface(out, interfaceItemBasePage) {
+		t.Fatalf("missing interface %s: %#v", interfaceItemBasePage, out["interfaces"])
+	}
+	body := f.postBodies[pathItemBasePage]
+	if _, ok := body["outerIds"]; ok {
+		t.Fatalf("outerIds should be omitted without style-code: %#v", body)
+	}
+	if _, ok := body["title"]; ok {
+		t.Fatalf("title should be omitted without title filter: %#v", body)
 	}
 }
 
@@ -213,6 +257,9 @@ func TestExecuteShopsReturnsAvailability(t *testing.T) {
 	if !containsPath(f.getCalls, pathShopAll) {
 		t.Fatalf("missing shop query call: %#v", f.getCalls)
 	}
+	if !containsInterface(out, interfaceShopAll) {
+		t.Fatalf("missing interface %s: %#v", interfaceShopAll, out["interfaces"])
+	}
 }
 
 func TestExecutePublishPDDSubmitsWhenRequested(t *testing.T) {
@@ -225,11 +272,40 @@ func TestExecutePublishPDDSubmitsWhenRequested(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !containsPath(f.postCalls, pathPddBatchPublish) {
+	if !containsPath(f.postCalls, pathStorageTask) {
 		t.Fatalf("missing submit call: %#v", f.postCalls)
 	}
-	if f.postBody == nil || f.postBody["flowNumber"] == "" {
-		t.Fatalf("submit body missing flowNumber: %#v", f.postBody)
+	if f.postBody == nil || f.postBody["taskType"] != defaultPublishType {
+		t.Fatalf("submit body missing taskType: %#v", f.postBody)
+	}
+}
+
+func TestExecutePublishPlatformFXGPlansWithoutPDDOnlyCalls(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executePublishPlatform(context.Background(), f, publishPlatformOptions{
+		Platform:  "fxg",
+		StyleCode: "揭阳仓#M01-SCM-VPEgL",
+		ShopID:    123,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := got.(map[string]any)
+	if plan["platform"] != "fxg" {
+		t.Fatalf("platform = %#v", plan["platform"])
+	}
+	if containsPath(f.postCalls, pathPddCarouselVideo) || containsPath(f.postCalls, pathPddAuthorize) {
+		t.Fatalf("fxg should not call PDD-only APIs: %#v", f.postCalls)
+	}
+	if !containsPath(f.postCalls, pathPreCheckPrice) {
+		t.Fatalf("missing precheck call: %#v", f.postCalls)
+	}
+	if !containsPath(f.postCalls, pathSecConfirm) {
+		t.Fatalf("missing sec confirm call: %#v", f.postCalls)
+	}
+	body := plan["publish_body"].(map[string]any)
+	if body["taskType"] != defaultPublishType {
+		t.Fatalf("taskType = %#v", body["taskType"])
 	}
 }
 
@@ -248,11 +324,78 @@ func TestExecutePublishPDDCanCheckLogAfterSubmit(t *testing.T) {
 	if plan["publish_log"] == nil {
 		t.Fatalf("missing publish_log: %#v", plan)
 	}
+	if !containsInterface(plan, interfaceStorageTask) {
+		t.Fatalf("missing interface %s: %#v", interfaceStorageTask, plan["interfaces"])
+	}
+	if !containsInterface(plan, interfaceQueryTask) {
+		t.Fatalf("missing interface %s: %#v", interfaceQueryTask, plan["interfaces"])
+	}
 	if !containsPath(f.postCalls, pathPublishLog) {
 		t.Fatalf("missing log query call: %#v", f.postCalls)
 	}
 	if !containsPath(f.getCalls, pathPublishLogDetail) {
 		t.Fatalf("missing log detail call: %#v", f.getCalls)
+	}
+}
+
+func TestPDDPrimitivesExposeSingleInterfaces(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executePDDPricePrecheck(context.Background(), f, pddPrimitiveOptions{
+		StyleCode: "揭阳仓#M01-SCM-VPEgL",
+		ShopID:    123,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := got.(map[string]any)
+	if !containsInterface(out, interfacePreCheckPrice) {
+		t.Fatalf("missing interface %s: %#v", interfacePreCheckPrice, out["interfaces"])
+	}
+	req := out["request"].(map[string]any)
+	if req["api_name"] != "ltsTask_preCheckControllerPrice" {
+		t.Fatalf("api_name = %#v", req["api_name"])
+	}
+	if !containsPath(f.postCalls, pathPreCheckPrice) {
+		t.Fatalf("missing precheck call: %#v", f.postCalls)
+	}
+}
+
+func TestPDDStorageTaskPrimitiveDefaultsToDryRun(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executePDDStorageTask(context.Background(), f, pddPrimitiveOptions{
+		StyleCode: "揭阳仓#M01-SCM-VPEgL",
+		ShopID:    123,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := got.(map[string]any)
+	if out["dry_run"] != true {
+		t.Fatalf("dry_run = %#v", out["dry_run"])
+	}
+	if containsPath(f.postCalls, pathStorageTask) {
+		t.Fatalf("unexpected submit call: %#v", f.postCalls)
+	}
+	req := out["request"].(map[string]any)
+	if req["taskType"] != defaultPublishType {
+		t.Fatalf("taskType = %#v", req["taskType"])
+	}
+}
+
+func TestPDDTaskSpeedPrimitive(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executePDDTaskSpeed(context.Background(), f, pddPrimitiveOptions{
+		BatchTaskID: "task-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := got.(map[string]any)
+	if !containsInterface(out, interfaceQueryTask) {
+		t.Fatalf("missing interface %s: %#v", interfaceQueryTask, out["interfaces"])
+	}
+	if !containsPath(f.getCalls, pathQueryTaskSpeed) {
+		t.Fatalf("missing task speed call: %#v", f.getCalls)
 	}
 }
 
@@ -273,11 +416,27 @@ func TestExecutePublishLogReturnsFailureReason(t *testing.T) {
 	if failures[0]["errorMessage"] != "类目属性缺失" {
 		t.Fatalf("errorMessage = %#v", failures[0]["errorMessage"])
 	}
+	if !containsInterface(out, interfacePublishLogDetail) {
+		t.Fatalf("missing interface %s: %#v", interfacePublishLogDetail, out["interfaces"])
+	}
 }
 
 func containsPath(items []string, want string) bool {
 	for _, item := range items {
 		if item == want {
+			return true
+		}
+	}
+	return false
+}
+
+func containsInterface(out map[string]any, want string) bool {
+	items, ok := out["interfaces"].([]map[string]any)
+	if !ok {
+		return false
+	}
+	for _, item := range items {
+		if item["name"] == want {
 			return true
 		}
 	}
