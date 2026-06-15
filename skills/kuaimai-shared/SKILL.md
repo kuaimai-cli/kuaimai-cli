@@ -14,8 +14,8 @@ metadata:
 
 | 用户意图 | 下一步 Skill |
 |----------|--------------|
-| ERP 商品档案：查询、列表、统计、详情、新增、编辑、改标题 | [`kuaimai-erp-item`](../kuaimai-erp-item/SKILL.md) |
-| SCM 商品 / 可铺货商品：供应链商品、分销商品、上货、铺货、铺货日志 | [`kuaimai-scm-item`](../kuaimai-scm-item/SKILL.md) |
+| 商品、款式编码、供应链商品、SCM 商品、可铺货商品、分销商品、上货、铺货、铺货日志 | [`kuaimai-scm-item`](../kuaimai-scm-item/SKILL.md) |
+| ERP 商品档案：明确出现“商品档案 / ERP 商品档案 / sysItemId / ERP 档案资料维护” | [`kuaimai-erp-item`](../kuaimai-erp-item/SKILL.md) |
 | 配置、登录、registry 发现、输出格式 | **本 Skill** |
 
 ## CLI 可执行文件
@@ -41,14 +41,23 @@ metadata:
 ```text
 有 shortcut → 读域 Skill，不查 schema
 无 shortcut → capabilities → schema <apiId> → web call <apiId>
-不知道有哪些接口 → capabilities 或 schema 全量
+不知道有哪些接口 → 先选业务域，再只在该域 capabilities 中找 1-3 个高置信候选
 ```
 
 **商品口径必须先分清**：
 
-- 用户说“商品档案”的查询、列表、详情、新增、编辑、改标题 → `kuaimai-erp-item`。
-- 用户说“上货/铺货/发布到店铺/供应链商品/SCM 商品/分销商品” → `kuaimai-scm-item`。
-- 只说“商品”但目标是铺货到店铺 → 视为 `kuaimai-scm-item`；只说“商品”且目标是档案资料维护 → 视为 `kuaimai-erp-item`。
+- 默认：用户只说“商品 / 款式编码 / outerId / 标题修改 / 上货 / 铺货 / 供应链商品 / SCM 商品 / 分销商品” → `kuaimai-scm-item`。
+- 只有明确说“商品档案 / ERP 商品档案 / sysItemId / ERP 档案资料维护 / ERP 商品档案改标题” → `kuaimai-erp-item`。
+- 例如“修改商品款式编码为 X 的标题”属于 `scm-item`；不要因为出现“改标题”就切到 `erp-item`。
+- 例如“修改商品款式编码为：69c1025cec66640001436846，将他的标题修改为：小红书测试商品-勿拍33-cli更新后的标题”属于 `scm-item`；先 `scm-item +list` 定位，再做 SCM 域 bounded discovery。找不到标题修改能力时停止说明能力缺口。
+- `erp-item` 是 ERP 商品档案维护，不是普通商品入口；SCM 商品才用于上货/铺货。
+
+**能力发现边界（CRITICAL）**：
+
+- 先按上面的商品口径选定一个业务域；选定后不要在 `scm-item`、`erp-item`、`api`、`web` 之间来回无边界尝试。
+- 所选域无 shortcut 时，只能在该域内走 `capabilities → schema → web call`。例如 SCM 商品只筛 `scm` / `供应链` 域接口；ERP 商品档案只筛 `erp` / `商品档案` 域接口。
+- 如果该域 capabilities 中找不到 1-3 个高置信候选接口，停止并说明“当前 registry 未发布该能力”，不要枚举尝试所有 capabilities、所有 commands 或所有 API。
+- `--help` 只能用于确认 shortcut 是否存在；不能把“help 中没看到”理解为可以遍历所有其他业务域。
 
 ## Registry 接口发现（核心）
 

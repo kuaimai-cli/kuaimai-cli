@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kuaimai-cli/kuaimai-cli/internal/build"
 	"github.com/spf13/cobra"
 )
 
@@ -45,9 +46,10 @@ func TestCheckWithCacheUsesFile(t *testing.T) {
 	}
 	st := VersionCheckState{
 		LastCheckAt: time.Now(),
+		CLIVersion:  build.Version,
 		LastResult: &CheckResult{
-			Current:     "v0.1.0",
-			Latest:      "v0.1.0",
+			Current:     build.Version,
+			Latest:      build.Version,
 			UpdateAvail: false,
 		},
 	}
@@ -60,5 +62,36 @@ func TestCheckWithCacheUsesFile(t *testing.T) {
 	}
 	if res == nil || res.UpdateAvail {
 		t.Fatalf("cached result = %+v", res)
+	}
+}
+
+func TestUpdateCheckCachePolicy(t *testing.T) {
+	if defaultCheckInterval != time.Hour {
+		t.Fatalf("defaultCheckInterval = %s, want 1h", defaultCheckInterval)
+	}
+	now := time.Now()
+	current := build.Version
+	st := VersionCheckState{
+		LastCheckAt: now.Add(-2 * time.Hour),
+		CLIVersion:  current,
+		LastResult: &CheckResult{
+			Current:     current,
+			Latest:      "v9.9.9",
+			UpdateAvail: true,
+		},
+	}
+	if !shouldUseCachedVersionCheck(st, now) {
+		t.Fatal("update-available cache should keep prompting until user upgrades")
+	}
+
+	st.LastResult.UpdateAvail = false
+	if shouldUseCachedVersionCheck(st, now) {
+		t.Fatal("no-update cache older than 1h should be refreshed")
+	}
+
+	st.LastCheckAt = now
+	st.CLIVersion = "0.0.1"
+	if shouldUseCachedVersionCheck(st, now) {
+		t.Fatal("cache from a different CLI version should not be reused")
 	}
 }

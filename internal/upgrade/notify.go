@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kuaimai-cli/kuaimai-cli/internal/build"
 	"github.com/spf13/cobra"
 )
 
-const defaultCheckInterval = 24 * time.Hour
+const defaultCheckInterval = time.Hour
 
 // ShouldSkipUpdateCheck reports whether background update notification should be skipped.
 func ShouldSkipUpdateCheck(cmd *cobra.Command) bool {
@@ -29,7 +30,7 @@ func ShouldSkipUpdateCheck(cmd *cobra.Command) bool {
 }
 
 // MaybeNotify prints a one-line stderr hint when a newer release is available.
-// Uses a 24h cache in ~/.kuaimai-cli/version-check.json.
+// Uses a 1h cache in ~/.kuaimai-cli/version-check.json.
 func MaybeNotify(cmd *cobra.Command) {
 	if ShouldSkipUpdateCheck(cmd) {
 		return
@@ -47,7 +48,7 @@ func MaybeNotify(cmd *cobra.Command) {
 
 func checkWithCache(repo string) (*CheckResult, error) {
 	st, _ := loadVersionCheckState()
-	if st.LastResult != nil && time.Since(st.LastCheckAt) < defaultCheckInterval {
+	if shouldUseCachedVersionCheck(st, time.Now()) {
 		return st.LastResult, nil
 	}
 	res, err := CheckLatest(repo)
@@ -58,4 +59,24 @@ func checkWithCache(repo string) (*CheckResult, error) {
 	st.LastResult = res
 	_ = saveVersionCheckState(st)
 	return res, nil
+}
+
+func shouldUseCachedVersionCheck(st VersionCheckState, now time.Time) bool {
+	if st.LastResult == nil {
+		return false
+	}
+	if st.CLIVersion != "" && trimVersionPrefix(st.CLIVersion) != trimVersionPrefix(build.Version) {
+		return false
+	}
+	if st.LastResult.Current != "" && trimVersionPrefix(st.LastResult.Current) != trimVersionPrefix(build.Version) {
+		return false
+	}
+	if st.LastResult.UpdateAvail {
+		return true
+	}
+	return now.Sub(st.LastCheckAt) < defaultCheckInterval
+}
+
+func trimVersionPrefix(v string) string {
+	return strings.TrimPrefix(strings.TrimSpace(v), "v")
 }

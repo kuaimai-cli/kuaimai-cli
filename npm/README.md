@@ -51,7 +51,7 @@ npx @kuaimai-cli/cli@latest install
 npm install -g @kuaimai-cli/cli@latest
 ```
 
-任意命令结束后（24h 缓存）若有新版会在 **stderr** 提示；`upgrade` 默认会执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills。仅检查请加 `--check-only`。禁用提示：`KUAIMAI_CLI_SKIP_UPDATE_CHECK=1`。
+任意命令结束后（1 小时缓存；已发现新版本会持续提示到升级）若有新版会在 **stderr** 提示；`upgrade` 默认会执行 `npm install -g @kuaimai-cli/cli@latest` 并同步 Skills。仅检查请加 `--check-only`。禁用提示：`KUAIMAI_CLI_SKIP_UPDATE_CHECK=1`。
 
 `npx @kuaimai-cli/cli@latest install`（**0.1.8+**）：若全局 npm 包版本低于向导包，会自动升级而非「有旧包就跳过」。强制重装：`KUAIMAI_CLI_FORCE_INSTALL=1 npx @kuaimai-cli/cli@latest install`。
 

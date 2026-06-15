@@ -2,6 +2,18 @@
 
 本文件记录 kuaimai-cli 各版本的主要变更。
 
+## 0.2.8
+
+### Added
+
+- **SCM 商品编辑 shortcut**：新增 `scm-item update-title`，支持按 `--style-code` 或 `--id` 读取 SCM 商品详情，只修改 `title` 并按前端保存格式提交 `/item/base/queryErpItems` 与 `/item/base/edit`；默认 dry-run，显式 `--submit` 才保存。
+- **SCM 商品接口文档**：将原 PDD 铺货文档重命名为 `docs/SCM商品相关接口.md`，全量记录 SCM 商品查询、编辑、铺货、日志相关接口。
+
+### Changed
+
+- **Skill 路由约束**：强化 ERP 商品档案与 SCM 商品的意图区分，普通“商品 / 款式编码 / outerId / 标题修改”默认走 SCM，只有明确“商品档案 / sysItemId”才走 ERP 商品档案。
+- **版本提示缓存**：升级提示从 24 小时缓存调整为 1 小时缓存；已发现新版本时持续提示到用户升级。
+
 ## 0.2.6
 
 ### Fixed

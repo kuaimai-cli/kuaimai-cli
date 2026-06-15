@@ -313,7 +313,7 @@ kuaimai-cli upgrade   # 有新版时：npm 全局安装 + skill 同步（需网�
 - [ ] 单元测试与 E2E 冒烟通过
 - [ ] `doctor` 输出 `ready` 与 `next` 步骤
 - [ ] `upgrade --check-only` 可查询 GitHub Release（需网络）
-- [ ] 任意命令后 stderr 可出现新版本提示（24h 内可能因缓存不重复）
+- [ ] 任意命令后 stderr 可出现新版本提示（1 小时内可能因无更新缓存不重复；已发现新版本会持续提示到升级）
 - [ ] `skill install --if-stale` 在 Release 变化时可更新 Skills
 
 ### 6.2 鉴权增强

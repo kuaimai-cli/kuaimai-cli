@@ -19,6 +19,15 @@ type envelope struct {
 	Hint  string          `json:"hint"`
 }
 
+type forwardRequest struct {
+	TargetHost  string            `json:"targetHost"`
+	Method      string            `json:"method"`
+	Path        string            `json:"path"`
+	QueryParams map[string]string `json:"queryParams"`
+	Body        string            `json:"body"`
+	ContentType string            `json:"contentType"`
+}
+
 func TestSmokeConfigAuthDryRun(t *testing.T) {
 	bin := buildCLI(t)
 	home := t.TempDir()
@@ -35,7 +44,12 @@ func TestSmokeConfigAuthDryRun(t *testing.T) {
 	runOK(t, bin, "config", "init")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/item/stock/queryCount" {
+		var req forwardRequest
+		if r.URL.Path != "/api/forward" || json.NewDecoder(r.Body).Decode(&req) != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if req.Path != "/item/stock/queryCount" {
 			http.NotFound(w, r)
 			return
 		}
@@ -52,6 +66,7 @@ func TestSmokeConfigAuthDryRun(t *testing.T) {
 	t.Setenv("KUAIMAI_CLI_TOKEN_FILE", tokenFile)
 
 	runOK(t, bin, "config", "set", "api.url", srv.URL)
+	runOK(t, bin, "config", "set", "api.gateway_url", srv.URL)
 	runOK(t, bin, "auth", "login", "test-token-12345678")
 
 	checkOut := runOK(t, bin, "auth", "check", "--output", "json")
@@ -66,7 +81,7 @@ func TestSmokeConfigAuthDryRun(t *testing.T) {
 		t.Fatalf("auth status failed")
 	}
 
-	dryOut := runOK(t, bin, "item", "save", "--body", `{"sysItemId":1,"title":"x"}`, "--dry-run", "--output", "json")
+	dryOut := runOK(t, bin, "erp-item", "save", "--body", `{"sysItemId":1,"title":"x"}`, "--dry-run", "--output", "json")
 	mustJSON(t, dryOut, &env)
 	if !env.OK {
 		t.Fatalf("dry-run save: %s", env.Error)
@@ -91,15 +106,20 @@ func TestRegistryWebCallCapabilities(t *testing.T) {
 	seedRegistryCache(t, home)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req forwardRequest
+		if r.URL.Path != "/api/forward" || json.NewDecoder(r.Body).Decode(&req) != nil {
+			http.NotFound(w, r)
+			return
+		}
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/luotao/test/get":
-			if got := r.URL.Query().Get("keyword"); got != "hello" {
+		case req.Method == http.MethodGet && req.Path == "/api/luotao/test/get":
+			if got := req.QueryParams["keyword"]; got != "hello" {
 				http.Error(w, "bad keyword", http.StatusBadRequest)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"suc":true,"data":{"items":[]}}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/luotao/test/post":
+		case req.Method == http.MethodPost && req.Path == "/api/luotao/test/post":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"suc":true}`))
 		default:
@@ -112,6 +132,7 @@ func TestRegistryWebCallCapabilities(t *testing.T) {
 	t.Setenv("KUAIMAI_CLI_TOKEN_FILE", tokenFile)
 	runOK(t, bin, "config", "init")
 	runOK(t, bin, "config", "set", "api.url", srv.URL)
+	runOK(t, bin, "config", "set", "api.gateway_url", srv.URL)
 	runOK(t, bin, "auth", "login", "test-token-12345678")
 
 	var env envelope
@@ -194,7 +215,7 @@ func projectRoot(t *testing.T) string {
 func runOK(t *testing.T, bin string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
-	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	cmd.Env = append(os.Environ(), "NO_COLOR=1", "KUAIMAI_CLI_SKIP_REGISTRY_SYNC=1")
 	if v := os.Getenv("KUAIMAI_CLI_TOKEN_FILE"); v != "" {
 		cmd.Env = append(cmd.Env, "KUAIMAI_CLI_TOKEN_FILE="+v)
 	}

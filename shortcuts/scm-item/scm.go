@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,9 @@ const (
 	shortcutName = "scm-item"
 
 	pathItemBasePage       = "/item/base/page.json"
+	pathItemBaseDetail     = "/item/base/detail.json"
+	pathItemBaseEdit       = "/item/base/edit.json"
+	pathQueryErpItems      = "/item/base/queryErpItems.json"
 	pathShopAll            = "/shop/allShop.json"
 	pathPddCarouselVideo   = "/pdd/getCarouselVideoInfo.json"
 	pathPreCheckPrice      = "/ltsTask/preCheckControllerPrice.json"
@@ -38,6 +42,9 @@ const (
 	apiNameItemBasePage    = "item_base_page"
 
 	interfaceItemBasePage     = "item.base.page"
+	interfaceItemBaseDetail   = "item.base.detail"
+	interfaceItemBaseEdit     = "item.base.edit"
+	interfaceQueryErpItems    = "item.base.queryErpItems"
 	interfaceShopAll          = "shop.allShop"
 	interfacePddCarouselVideo = "pdd.getCarouselVideoInfo"
 	interfacePreCheckPrice    = "ltsTask.preCheckControllerPrice"
@@ -111,6 +118,15 @@ type publishLogOptions struct {
 	Detail    bool
 }
 
+type updateTitleOptions struct {
+	ID         int64
+	StyleCode  string
+	Title      string
+	Submit     bool
+	CheckSync  bool
+	SkipAddERP bool
+}
+
 type pddPrimitiveOptions struct {
 	StyleCode      string
 	BaseItemID     string
@@ -161,6 +177,7 @@ func Register(root *cobra.Command) {
 		Short: "SCM 可铺货商品命令（erp-scm，可上货/铺货到店铺）",
 	}
 	cmd.AddCommand(listProductsCmd())
+	cmd.AddCommand(updateTitleCmd())
 	cmd.AddCommand(shopsCmd())
 	cmd.AddCommand(publishPlatformCmd())
 	cmd.AddCommand(publishPDDCmd())
@@ -185,6 +202,27 @@ func listProductsCmd() *cobra.Command {
 	c.Flags().StringVar(&opts.Title, "title", "", "标题关键词（简单查询；复杂条件请用 capabilities/schema/web call）")
 	c.Flags().IntVar(&opts.PageNo, "page", 1, "页码")
 	c.Flags().IntVar(&opts.PageSize, "page-size", 10, "每页条数")
+	return c
+}
+
+func updateTitleCmd() *cobra.Command {
+	var opts updateTitleOptions
+	c := &cobra.Command{
+		Use:   "update-title",
+		Short: "修改 SCM 商品名称（先读取详情，默认只生成保存请求体）",
+		Example: `  kuaimai-cli scm-item update-title --style-code '<款式编码>' --title '<新商品名称>' --output json
+  kuaimai-cli scm-item update-title --id 123456 --title '<新商品名称>' --submit --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUpdateTitle(context.Background(), opts)
+		},
+	}
+	c.Flags().Int64Var(&opts.ID, "id", 0, "SCM 商品自增 id（与 --style-code 二选一）")
+	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（与 --id 二选一，会先从列表唯一定位 id）")
+	c.Flags().StringVar(&opts.Title, "title", "", "新商品名称（必填）")
+	c.Flags().BoolVar(&opts.Submit, "submit", false, "实际调用 /item/base/queryErpItems 与 /item/base/edit 保存修改")
+	c.Flags().BoolVar(&opts.CheckSync, "check-open-sync", false, "保存体 checkOpenSync，默认 false")
+	c.Flags().BoolVar(&opts.SkipAddERP, "skip-add-item-to-erp", true, "保存体 skipAddItemToErp，默认 true")
+	_ = c.MarkFlagRequired("title")
 	return c
 }
 
@@ -544,6 +582,17 @@ func runShops(ctx context.Context, opts shopsOptions) error {
 	})
 }
 
+func runUpdateTitle(ctx context.Context, opts updateTitleOptions) error {
+	f, err := cmdutil.NewFactory()
+	if err != nil {
+		return err
+	}
+	r := common.NewRunner(f)
+	return r.ExecuteWithBase(ctx, f.Config.ShortcutAPIURL(shortcutName), func(ctx context.Context, c *client.Client) (any, error) {
+		return executeUpdateTitle(ctx, c, opts)
+	})
+}
+
 func runPublishLog(ctx context.Context, opts publishLogOptions) error {
 	f, err := cmdutil.NewFactory()
 	if err != nil {
@@ -627,6 +676,78 @@ func executeListProducts(ctx context.Context, c httpClient, opts listProductsOpt
 		},
 		"next": "确认商品 canPublishPlatform 包含目标平台后，可用 scm-item shops 查询可铺货店铺",
 	}, nil
+}
+
+func executeUpdateTitle(ctx context.Context, c httpClient, opts updateTitleOptions) (any, error) {
+	title := strings.TrimSpace(opts.Title)
+	if title == "" {
+		return nil, fmt.Errorf("--title 不能为空")
+	}
+	if opts.ID == 0 && strings.TrimSpace(opts.StyleCode) == "" {
+		return nil, fmt.Errorf("--id 与 --style-code 至少提供一个")
+	}
+	id := opts.ID
+	product := map[string]any{}
+	if id == 0 {
+		found, err := findProductByStyleCode(ctx, c, opts.StyleCode)
+		if err != nil {
+			return nil, err
+		}
+		product = found
+		var parseErr error
+		id, parseErr = int64Field(found, "id")
+		if parseErr != nil || id == 0 {
+			return nil, fmt.Errorf("商品 %s 缺少列表 id，无法调用 /item/base/detail", opts.StyleCode)
+		}
+	}
+
+	detail, rawDetail, err := fetchBaseItemDetail(ctx, c, id)
+	if err != nil {
+		return nil, err
+	}
+	oldTitle := stringField(detail, "title")
+	item := prepareSCMEditItem(detail, title)
+	saveBody := scmEditBody(item, opts)
+	queryBody := cloneMap(item)
+	queryBody["api_name"] = "item_base_queryErpItems"
+
+	interfaces := []map[string]any{
+		interfaceInfo(interfaceItemBaseDetail, "GET", pathItemBaseDetail),
+		interfaceInfo(interfaceQueryErpItems, "POST", pathQueryErpItems),
+		interfaceInfo(interfaceItemBaseEdit, "POST", pathItemBaseEdit),
+	}
+	endpoints := []string{pathItemBaseDetail, pathQueryErpItems, pathItemBaseEdit}
+	out := map[string]any{
+		"id":         id,
+		"style_code": strings.TrimSpace(opts.StyleCode),
+		"old_title":  oldTitle,
+		"new_title":  title,
+		"submit":     opts.Submit,
+		"dry_run":    !opts.Submit,
+		"product":    productSummary(product),
+		"detail_raw": rawDetail,
+		"query_body": queryBody,
+		"save_body":  saveBody,
+		"interfaces": interfaces,
+		"endpoints":  endpoints,
+	}
+	if !opts.Submit {
+		out["next"] = "确认 save_body 只变更 title 后，加 --submit 实际保存"
+		return out, nil
+	}
+
+	queryRaw, _, err := c.PostJSON(ctx, pathQueryErpItems, queryBody)
+	if err != nil {
+		return nil, fmt.Errorf("SCM 保存前 ERP 同步校验失败: %w", err)
+	}
+	saveRaw, _, err := c.PostJSON(ctx, pathItemBaseEdit, saveBody)
+	if err != nil {
+		return nil, fmt.Errorf("保存 SCM 商品名称失败: %w", err)
+	}
+	out["dry_run"] = false
+	out["sync_check"] = queryRaw
+	out["save_result"] = saveRaw
+	return out, nil
 }
 
 func executePDDVideoInfo(ctx context.Context, c httpClient, opts pddPrimitiveOptions) (any, error) {
@@ -1159,6 +1280,43 @@ func queryTaskSpeed(ctx context.Context, c httpClient, batchTaskID string, maxPo
 		}
 	}
 	return out, nil
+}
+
+func fetchBaseItemDetail(ctx context.Context, c httpClient, id int64) (map[string]any, any, error) {
+	if id == 0 {
+		return nil, nil, fmt.Errorf("SCM 商品 id 不能为空")
+	}
+	q := url.Values{}
+	q.Set("id", strconv.FormatInt(id, 10))
+	q.Set("api_name", "item_base_detail")
+	raw, _, err := c.GetQuery(ctx, pathItemBaseDetail, map[string]any{
+		"id":       id,
+		"api_name": "item_base_detail",
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("查询 SCM 商品详情失败: %w", err)
+	}
+	item := dataMap(raw)
+	if len(item) == 0 {
+		return nil, raw, fmt.Errorf("SCM 商品详情为空: %s", q.Encode())
+	}
+	return item, raw, nil
+}
+
+func prepareSCMEditItem(detail map[string]any, newTitle string) map[string]any {
+	item := cloneMap(detail)
+	item["title"] = newTitle
+	item["api_name"] = "item_base_edit"
+	return item
+}
+
+func scmEditBody(item map[string]any, opts updateTitleOptions) map[string]any {
+	return map[string]any{
+		"item":             item,
+		"checkOpenSync":    opts.CheckSync,
+		"skipAddItemToErp": opts.SkipAddERP,
+		"api_name":         "item_base_edit",
+	}
 }
 
 func resolveBaseItem(ctx context.Context, c httpClient, styleCode, inputBaseItemID string) (string, map[string]any, error) {

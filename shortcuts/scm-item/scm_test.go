@@ -34,6 +34,7 @@ func (f *fakeClient) PostJSON(ctx context.Context, path string, body any) (any, 
 			"data": map[string]any{
 				"records": []any{
 					map[string]any{
+						"id":                     float64(456),
 						"outerId":                "揭阳仓#M01-SCM-VPEgL",
 						"baseItemId":             "92ee1d081c7d000",
 						"title":                  "测试商品",
@@ -142,6 +143,20 @@ func (f *fakeClient) GetQuery(ctx context.Context, path string, params map[strin
 				"status": float64(4),
 			},
 		}, 200, nil
+	case pathItemBaseDetail:
+		return map[string]any{
+			"result": float64(1),
+			"data": map[string]any{
+				"id":         float64(456),
+				"baseItemId": "92ee1d081c7d000",
+				"outerId":    "揭阳仓#M01-SCM-VPEgL",
+				"title":      "测试商品",
+				"companyId":  float64(30482),
+				"skuList": []any{
+					map[string]any{"skuId": "sku-1", "outerId": "sku-code-1"},
+				},
+			},
+		}, 200, nil
 	default:
 		return nil, 0, nil
 	}
@@ -234,6 +249,76 @@ func TestExecuteListProductsAllowsNoFilter(t *testing.T) {
 	}
 	if _, ok := body["title"]; ok {
 		t.Fatalf("title should be omitted without title filter: %#v", body)
+	}
+}
+
+func TestExecuteUpdateTitlePlansWithoutSubmit(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executeUpdateTitle(context.Background(), f, updateTitleOptions{
+		StyleCode:  "揭阳仓#M01-SCM-VPEgL",
+		Title:      "新商品名称",
+		SkipAddERP: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := got.(map[string]any)
+	if out["dry_run"] != true {
+		t.Fatalf("dry_run = %#v", out["dry_run"])
+	}
+	if containsPath(f.postCalls, pathQueryErpItems) || containsPath(f.postCalls, pathItemBaseEdit) {
+		t.Fatalf("unexpected write calls: %#v", f.postCalls)
+	}
+	if !containsPath(f.postCalls, pathItemBasePage) {
+		t.Fatalf("missing style-code lookup call: %#v", f.postCalls)
+	}
+	if !containsPath(f.getCalls, pathItemBaseDetail) {
+		t.Fatalf("missing detail call: %#v", f.getCalls)
+	}
+	saveBody := out["save_body"].(map[string]any)
+	item := saveBody["item"].(map[string]any)
+	if item["title"] != "新商品名称" {
+		t.Fatalf("title = %#v", item["title"])
+	}
+	if saveBody["checkOpenSync"] != false {
+		t.Fatalf("checkOpenSync = %#v", saveBody["checkOpenSync"])
+	}
+	if saveBody["skipAddItemToErp"] != true {
+		t.Fatalf("skipAddItemToErp = %#v", saveBody["skipAddItemToErp"])
+	}
+	if !containsInterface(out, interfaceItemBaseDetail) || !containsInterface(out, interfaceItemBaseEdit) {
+		t.Fatalf("missing edit interfaces: %#v", out["interfaces"])
+	}
+}
+
+func TestExecuteUpdateTitleSubmitsSyncThenEdit(t *testing.T) {
+	f := &fakeClient{}
+	got, err := executeUpdateTitle(context.Background(), f, updateTitleOptions{
+		ID:         456,
+		Title:      "新商品名称",
+		Submit:     true,
+		SkipAddERP: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := got.(map[string]any)
+	if out["dry_run"] != false {
+		t.Fatalf("dry_run = %#v", out["dry_run"])
+	}
+	if !containsPath(f.postCalls, pathQueryErpItems) {
+		t.Fatalf("missing sync check call: %#v", f.postCalls)
+	}
+	if !containsPath(f.postCalls, pathItemBaseEdit) {
+		t.Fatalf("missing edit call: %#v", f.postCalls)
+	}
+	saveBody := f.postBodies[pathItemBaseEdit]
+	item := saveBody["item"].(map[string]any)
+	if item["title"] != "新商品名称" {
+		t.Fatalf("saved title = %#v", item["title"])
+	}
+	if _, ok := f.postBodies[pathItemBasePage]; ok {
+		t.Fatalf("id path should not query list: %#v", f.postBodies[pathItemBasePage])
 	}
 }
 

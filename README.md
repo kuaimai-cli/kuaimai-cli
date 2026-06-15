@@ -255,7 +255,7 @@ kuaimai-cli web call scm.dsb-query-distribution-config \
   --output json
 ```
 
-详见 `skills/kuaimai-scm-item/SKILL.md` 和 SCM 商品铺货 Shortcut 设计文档：`docs/SCM拼多多铺货Shortcut说明.md`。**勿与 item 混用**：路径同为 `/item/*` 时，`web call item.*`（erp1）与 `web call scm.item-*`（scm）语义不同。
+详见 `skills/kuaimai-scm-item/SKILL.md` 和 SCM 商品相关接口文档：`docs/SCM商品相关接口.md`。**勿与 item 混用**：路径同为 `/item/*` 时，`web call item.*`（erp1）与 `web call scm.item-*`（scm）语义不同。
 
 ### Skill
 
@@ -348,7 +348,7 @@ npx @kuaimai-cli/cli@latest install
 npm install -g @kuaimai-cli/cli@latest
 ```
 
-- 任意命令结束后，若有新版会在 **stderr** 提示（24h 缓存，见 `~/.kuaimai-cli/version-check.json`）
+- 任意命令结束后，若有新版会在 **stderr** 提示（1 小时缓存；已发现新版本会持续提示到升级，见 `~/.kuaimai-cli/version-check.json`）
 - Skill：`skill install --if-stale`；CLI 版本变更后会尝试自动同步（`~/.kuaimai-cli/skill-sync.json`）
 - 禁用提示：`KUAIMAI_CLI_SKIP_UPDATE_CHECK=1`；禁用 Skill 自动同步：`KUAIMAI_CLI_SKIP_SKILL_SYNC=1`
 
