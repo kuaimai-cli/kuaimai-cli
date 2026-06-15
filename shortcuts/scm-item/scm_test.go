@@ -143,15 +143,19 @@ func (f *fakeClient) GetQuery(ctx context.Context, path string, params map[strin
 				"status": float64(4),
 			},
 		}, 200, nil
-	case pathItemBaseDetail:
+	case pathItemBaseDetail, pathItemBaseDetailByID:
 		return map[string]any{
 			"result": float64(1),
 			"data": map[string]any{
-				"id":         float64(456),
-				"baseItemId": "92ee1d081c7d000",
-				"outerId":    "揭阳仓#M01-SCM-VPEgL",
-				"title":      "测试商品",
-				"companyId":  float64(30482),
+				"id":                    float64(456),
+				"baseItemId":            "92ee1d081c7d000",
+				"outerId":               "揭阳仓#M01-SCM-VPEgL",
+				"title":                 "测试商品",
+				"companyId":             float64(30482),
+				"categoryId":            float64(377112471),
+				"leafCategoryId":        nil,
+				"smallShopItem":         nil,
+				"notCheckSyncFiledConf": nil,
 				"skuList": []any{
 					map[string]any{"skuId": "sku-1", "outerId": "sku-code-1"},
 				},
@@ -255,9 +259,9 @@ func TestExecuteListProductsAllowsNoFilter(t *testing.T) {
 func TestExecuteUpdateTitlePlansWithoutSubmit(t *testing.T) {
 	f := &fakeClient{}
 	got, err := executeUpdateTitle(context.Background(), f, updateTitleOptions{
-		StyleCode:  "揭阳仓#M01-SCM-VPEgL",
-		Title:      "新商品名称",
-		SkipAddERP: true,
+		StyleCode: "揭阳仓#M01-SCM-VPEgL",
+		Title:     "新商品名称",
+		CheckSync: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -272,7 +276,7 @@ func TestExecuteUpdateTitlePlansWithoutSubmit(t *testing.T) {
 	if !containsPath(f.postCalls, pathItemBasePage) {
 		t.Fatalf("missing style-code lookup call: %#v", f.postCalls)
 	}
-	if !containsPath(f.getCalls, pathItemBaseDetail) {
+	if !containsPath(f.getCalls, pathItemBaseDetailByID) {
 		t.Fatalf("missing detail call: %#v", f.getCalls)
 	}
 	saveBody := out["save_body"].(map[string]any)
@@ -280,13 +284,25 @@ func TestExecuteUpdateTitlePlansWithoutSubmit(t *testing.T) {
 	if item["title"] != "新商品名称" {
 		t.Fatalf("title = %#v", item["title"])
 	}
-	if saveBody["checkOpenSync"] != false {
+	if saveBody["checkOpenSync"] != true {
 		t.Fatalf("checkOpenSync = %#v", saveBody["checkOpenSync"])
 	}
-	if saveBody["skipAddItemToErp"] != true {
+	if saveBody["skipAddItemToErp"] != false {
 		t.Fatalf("skipAddItemToErp = %#v", saveBody["skipAddItemToErp"])
 	}
-	if !containsInterface(out, interfaceItemBaseDetail) || !containsInterface(out, interfaceItemBaseEdit) {
+	if _, ok := item["api_name"]; ok {
+		t.Fatalf("item api_name should be omitted: %#v", item["api_name"])
+	}
+	if item["smallShopItem"] != false {
+		t.Fatalf("smallShopItem = %#v", item["smallShopItem"])
+	}
+	if item["notCheckSyncFiledConf"] != true {
+		t.Fatalf("notCheckSyncFiledConf = %#v", item["notCheckSyncFiledConf"])
+	}
+	if item["categoryId"] != "" || item["leafCategoryId"] != "" {
+		t.Fatalf("categoryId/leafCategoryId = %#v/%#v", item["categoryId"], item["leafCategoryId"])
+	}
+	if !containsInterface(out, interfaceItemBaseDetailBy) || !containsInterface(out, interfaceItemBaseEdit) {
 		t.Fatalf("missing edit interfaces: %#v", out["interfaces"])
 	}
 }
@@ -294,10 +310,10 @@ func TestExecuteUpdateTitlePlansWithoutSubmit(t *testing.T) {
 func TestExecuteUpdateTitleSubmitsSyncThenEdit(t *testing.T) {
 	f := &fakeClient{}
 	got, err := executeUpdateTitle(context.Background(), f, updateTitleOptions{
-		ID:         456,
-		Title:      "新商品名称",
-		Submit:     true,
-		SkipAddERP: true,
+		ID:        456,
+		Title:     "新商品名称",
+		Submit:    true,
+		CheckSync: true,
 	})
 	if err != nil {
 		t.Fatal(err)

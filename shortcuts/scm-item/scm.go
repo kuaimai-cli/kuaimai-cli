@@ -23,6 +23,7 @@ const (
 
 	pathItemBasePage       = "/item/base/page.json"
 	pathItemBaseDetail     = "/item/base/detail.json"
+	pathItemBaseDetailByID = "/item/base/detailByBaseItemId.json"
 	pathItemBaseEdit       = "/item/base/edit.json"
 	pathQueryErpItems      = "/item/base/queryErpItems.json"
 	pathShopAll            = "/shop/allShop.json"
@@ -43,6 +44,7 @@ const (
 
 	interfaceItemBasePage     = "item.base.page"
 	interfaceItemBaseDetail   = "item.base.detail"
+	interfaceItemBaseDetailBy = "item.base.detailByBaseItemId"
 	interfaceItemBaseEdit     = "item.base.edit"
 	interfaceQueryErpItems    = "item.base.queryErpItems"
 	interfaceShopAll          = "shop.allShop"
@@ -120,6 +122,7 @@ type publishLogOptions struct {
 
 type updateTitleOptions struct {
 	ID         int64
+	BaseItemID string
 	StyleCode  string
 	Title      string
 	Submit     bool
@@ -217,11 +220,12 @@ func updateTitleCmd() *cobra.Command {
 		},
 	}
 	c.Flags().Int64Var(&opts.ID, "id", 0, "SCM 商品自增 id（与 --style-code 二选一）")
-	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（与 --id 二选一，会先从列表唯一定位 id）")
+	c.Flags().StringVar(&opts.BaseItemID, "base-item-id", "", "SCM 商品 baseItemId（优先使用前端 detailByBaseItemId 详情接口）")
+	c.Flags().StringVar(&opts.StyleCode, "style-code", "", "款式编码 outerId（与 --id/--base-item-id 至少提供一个，会先从列表唯一定位 id/baseItemId）")
 	c.Flags().StringVar(&opts.Title, "title", "", "新商品名称（必填）")
 	c.Flags().BoolVar(&opts.Submit, "submit", false, "实际调用 /item/base/queryErpItems 与 /item/base/edit 保存修改")
-	c.Flags().BoolVar(&opts.CheckSync, "check-open-sync", false, "保存体 checkOpenSync，默认 false")
-	c.Flags().BoolVar(&opts.SkipAddERP, "skip-add-item-to-erp", true, "保存体 skipAddItemToErp，默认 true")
+	c.Flags().BoolVar(&opts.CheckSync, "check-open-sync", true, "保存体 checkOpenSync，默认 true（与前端编辑页一致）")
+	c.Flags().BoolVar(&opts.SkipAddERP, "skip-add-item-to-erp", false, "保存体 skipAddItemToErp，默认 false（与前端编辑页一致）")
 	_ = c.MarkFlagRequired("title")
 	return c
 }
@@ -683,25 +687,48 @@ func executeUpdateTitle(ctx context.Context, c httpClient, opts updateTitleOptio
 	if title == "" {
 		return nil, fmt.Errorf("--title 不能为空")
 	}
-	if opts.ID == 0 && strings.TrimSpace(opts.StyleCode) == "" {
-		return nil, fmt.Errorf("--id 与 --style-code 至少提供一个")
+	baseItemID := strings.TrimSpace(opts.BaseItemID)
+	if opts.ID == 0 && baseItemID == "" && strings.TrimSpace(opts.StyleCode) == "" {
+		return nil, fmt.Errorf("--id、--base-item-id、--style-code 至少提供一个")
 	}
 	id := opts.ID
 	product := map[string]any{}
-	if id == 0 {
+	styleCode := strings.TrimSpace(opts.StyleCode)
+	if styleCode != "" && (id == 0 || baseItemID == "") {
 		found, err := findProductByStyleCode(ctx, c, opts.StyleCode)
 		if err != nil {
 			return nil, err
 		}
 		product = found
-		var parseErr error
-		id, parseErr = int64Field(found, "id")
-		if parseErr != nil || id == 0 {
-			return nil, fmt.Errorf("商品 %s 缺少列表 id，无法调用 /item/base/detail", opts.StyleCode)
+		if id == 0 {
+			var parseErr error
+			id, parseErr = int64Field(found, "id")
+			if parseErr != nil || id == 0 {
+				return nil, fmt.Errorf("商品 %s 缺少列表 id", opts.StyleCode)
+			}
+		}
+		if baseItemID == "" {
+			baseItemID = stringField(found, "baseItemId", "itemId")
 		}
 	}
+	if id == 0 && baseItemID == "" {
+		return nil, fmt.Errorf("未能定位 SCM 商品 id 或 baseItemId，请提供 --style-code 或 --base-item-id")
+	}
 
-	detail, rawDetail, err := fetchBaseItemDetail(ctx, c, id)
+	var detail map[string]any
+	var rawDetail any
+	var detailInterface map[string]any
+	var detailEndpoint string
+	var err error
+	if baseItemID != "" {
+		detail, rawDetail, err = fetchBaseItemDetailByBaseItemID(ctx, c, baseItemID)
+		detailInterface = interfaceInfo(interfaceItemBaseDetailBy, "GET", pathItemBaseDetailByID)
+		detailEndpoint = pathItemBaseDetailByID
+	} else {
+		detail, rawDetail, err = fetchBaseItemDetail(ctx, c, id)
+		detailInterface = interfaceInfo(interfaceItemBaseDetail, "GET", pathItemBaseDetail)
+		detailEndpoint = pathItemBaseDetail
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -712,24 +739,25 @@ func executeUpdateTitle(ctx context.Context, c httpClient, opts updateTitleOptio
 	queryBody["api_name"] = "item_base_queryErpItems"
 
 	interfaces := []map[string]any{
-		interfaceInfo(interfaceItemBaseDetail, "GET", pathItemBaseDetail),
+		detailInterface,
 		interfaceInfo(interfaceQueryErpItems, "POST", pathQueryErpItems),
 		interfaceInfo(interfaceItemBaseEdit, "POST", pathItemBaseEdit),
 	}
-	endpoints := []string{pathItemBaseDetail, pathQueryErpItems, pathItemBaseEdit}
+	endpoints := []string{detailEndpoint, pathQueryErpItems, pathItemBaseEdit}
 	out := map[string]any{
-		"id":         id,
-		"style_code": strings.TrimSpace(opts.StyleCode),
-		"old_title":  oldTitle,
-		"new_title":  title,
-		"submit":     opts.Submit,
-		"dry_run":    !opts.Submit,
-		"product":    productSummary(product),
-		"detail_raw": rawDetail,
-		"query_body": queryBody,
-		"save_body":  saveBody,
-		"interfaces": interfaces,
-		"endpoints":  endpoints,
+		"id":           id,
+		"base_item_id": baseItemID,
+		"style_code":   strings.TrimSpace(opts.StyleCode),
+		"old_title":    oldTitle,
+		"new_title":    title,
+		"submit":       opts.Submit,
+		"dry_run":      !opts.Submit,
+		"product":      productSummary(product),
+		"detail_raw":   rawDetail,
+		"query_body":   queryBody,
+		"save_body":    saveBody,
+		"interfaces":   interfaces,
+		"endpoints":    endpoints,
 	}
 	if !opts.Submit {
 		out["next"] = "确认 save_body 只变更 title 后，加 --submit 实际保存"
@@ -1303,10 +1331,42 @@ func fetchBaseItemDetail(ctx context.Context, c httpClient, id int64) (map[strin
 	return item, raw, nil
 }
 
+func fetchBaseItemDetailByBaseItemID(ctx context.Context, c httpClient, baseItemID string) (map[string]any, any, error) {
+	baseItemID = strings.TrimSpace(baseItemID)
+	if baseItemID == "" {
+		return nil, nil, fmt.Errorf("SCM 商品 baseItemId 不能为空")
+	}
+	raw, _, err := c.GetQuery(ctx, pathItemBaseDetailByID, map[string]any{
+		"baseItemId": baseItemID,
+		"api_name":   "item_base_detailByBaseItemId",
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("查询 SCM 商品详情失败: %w", err)
+	}
+	item := dataMap(raw)
+	if len(item) == 0 {
+		return nil, raw, fmt.Errorf("SCM 商品详情为空: baseItemId=%s", baseItemID)
+	}
+	return item, raw, nil
+}
+
 func prepareSCMEditItem(detail map[string]any, newTitle string) map[string]any {
 	item := cloneMap(detail)
 	item["title"] = newTitle
-	item["api_name"] = "item_base_edit"
+	delete(item, "api_name")
+	if _, ok := item["smallShopItem"]; !ok || item["smallShopItem"] == nil {
+		item["smallShopItem"] = false
+	}
+	if _, ok := item["notCheckSyncFiledConf"]; !ok || item["notCheckSyncFiledConf"] == nil {
+		item["notCheckSyncFiledConf"] = true
+	}
+	// The SCM edit page posts blank category IDs when category selection is not being edited.
+	if _, ok := item["categoryId"]; ok {
+		item["categoryId"] = ""
+	}
+	if _, ok := item["leafCategoryId"]; ok {
+		item["leafCategoryId"] = ""
+	}
 	return item
 }
 

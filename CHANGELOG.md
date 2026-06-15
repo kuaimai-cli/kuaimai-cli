@@ -2,6 +2,12 @@
 
 本文件记录 kuaimai-cli 各版本的主要变更。
 
+## 0.2.9
+
+### Fixed
+
+- **SCM 标题编辑对齐前端保存链路**：`scm-item update-title` 优先使用 `/item/base/detailByBaseItemId.json` 读取详情，保存体默认改为 `checkOpenSync=true`、`skipAddItemToErp=false`，并补齐前端编辑页保存时的默认字段，避免部分小红书下载导入商品保存时报 `result=500`。
+
 ## 0.2.8
 
 ### Added

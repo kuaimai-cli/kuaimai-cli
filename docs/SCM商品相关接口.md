@@ -7,7 +7,8 @@
 | 场景 | 接口名 | 方法 | 路径 | 关键参数 |
 |---|---|---|---|---|
 | 查 SCM 商品 | `item.base.page` | POST JSON | `/item/base/page.json` | `pageNo`、`pageSize`、`outerIds:[styleCode]`、`outerIdBlur:0`、`title` |
-| 查 SCM 商品详情 | `item.base.detail` | GET query | `/item/base/detail.json` | `id` |
+| 查 SCM 商品详情 | `item.base.detailByBaseItemId` | GET query | `/item/base/detailByBaseItemId.json` | `baseItemId` |
+| 按自增 ID 查 SCM 商品详情 | `item.base.detail` | GET query | `/item/base/detail.json` | `id` |
 | 保存前 ERP 同步校验 | `item.base.queryErpItems` | POST JSON | `/item/base/queryErpItems.json` | `id`、`companyId`、`outerId`、`title`、商品详情字段 |
 | 编辑 SCM 商品 | `item.base.edit` | POST JSON | `/item/base/edit.json` | `item`、`checkOpenSync`、`skipAddItemToErp` |
 | 查可铺货店铺 | `shop.allShop` | GET query | `/shop/allShop.json` | `source:<platform>`、`subSource`、`baseItemId`、`channel` |
@@ -34,7 +35,7 @@
 
 | 命令 | 涉及接口 | 说明 |
 |---|---|---|
-| `scm-item update-title` | `item.base.page`、`item.base.detail`、`item.base.queryErpItems`、`item.base.edit` | 使用 `--style-code` 时先查列表定位 `id`；使用 `--id` 时跳过列表。默认只输出 `save_body`，加 `--submit` 才保存。 |
+| `scm-item update-title` | `item.base.page`、`item.base.detailByBaseItemId`、`item.base.queryErpItems`、`item.base.edit` | 使用 `--style-code` 时先查列表定位 `baseItemId`；优先按前端编辑页一致的 `detailByBaseItemId` 读取详情。默认只输出 `save_body`，加 `--submit` 才保存。 |
 
 编辑保存体格式：
 
@@ -44,12 +45,12 @@
     "id": 123456,
     "title": "新商品名称"
   },
-  "checkOpenSync": false,
-  "skipAddItemToErp": true
+  "checkOpenSync": true,
+  "skipAddItemToErp": false
 }
 ```
 
-实际 `item` 会来自 `/item/base/detail.json` 的完整商品详情，只覆盖 `title`。
+实际 `item` 会来自 `/item/base/detailByBaseItemId.json` 的完整商品详情，只覆盖 `title`，并补齐前端保存时使用的 `smallShopItem:false`、`notCheckSyncFiledConf:true` 等默认字段。
 
 ### 铺货预检与提交
 
@@ -78,4 +79,4 @@
 
 本次新增写入文档的接口：
 
-`item.base.detail`、`item.base.queryErpItems`、`item.base.edit`、`logging.publishLog`、`logging.publishLogDetail`、`logging.publishLogById`。
+`item.base.detailByBaseItemId`、`item.base.detail`、`item.base.queryErpItems`、`item.base.edit`、`logging.publishLog`、`logging.publishLogDetail`、`logging.publishLogById`。

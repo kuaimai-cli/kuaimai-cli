@@ -58,7 +58,7 @@ kuaimai-cli scm-item +list --style-code '<款式编码>' --output json
 | 用户需求 | 优先方式 | 说明 |
 |----------|----------|------|
 | 查询 SCM 可铺货商品 | `scm-item +list [--style-code <款式编码>] [--title <关键词>]` | 分页查询；款式编码和标题均为可选过滤条件，确认 `canPublishPlatform` 是否包含目标平台 |
-| 按商品款式编码修改标题，但无 shortcut | SCM 域 bounded discovery | 只找 SCM/供应链 item update/save/title 候选；找不到就停止并说明缺口 |
+| 修改 SCM 商品标题 | `scm-item update-title --style-code <款式编码> --title <新标题>` | 默认 dry-run；确认后加 `--submit`，按前端 `detailByBaseItemId → queryErpItems → edit` 链路保存 |
 | 查询商品可铺货店铺 | `scm-item shops --platform <平台key> --style-code <款式编码>` | 输出 `can_publish` 与 `disabled_reason` |
 | 按款式编码把商品铺货到指定平台店铺 | `scm-item publish --platform <平台key>` | 默认预检不提交；实际提交必须加 `--submit` |
 | PDD 兼容入口 | `scm-item publish-pdd` | 等价于 `publish --platform pdd`，保留给旧用法 |
@@ -72,6 +72,7 @@ kuaimai-cli scm-item +list --style-code '<款式编码>' --output json
 | Shortcut | 说明 |
 |----------|------|
 | `+list` | 查询 SCM 商品列表，可按款式编码/标题过滤 |
+| `update-title` | 修改 SCM 商品标题，默认只输出保存体 |
 | `shops` | 查询指定平台可铺货店铺 |
 | `publish` | 通用平台铺货预检/提交 |
 | `publish-pdd` | PDD 兼容铺货入口 |
@@ -89,6 +90,10 @@ kuaimai-cli scm-item +list --style-code '<款式编码>' --output json
 
 # 分页浏览 SCM 可铺货商品
 kuaimai-cli scm-item +list --page 1 --page-size 10 --output json
+
+# 修改 SCM 商品标题；先预检，确认后加 --submit 保存
+kuaimai-cli scm-item update-title --style-code '<款式编码>' --title '<新标题>' --output json
+kuaimai-cli scm-item update-title --style-code '<款式编码>' --title '<新标题>' --submit --output json
 
 # 查询该商品可铺货的目标平台店铺
 kuaimai-cli scm-item shops --platform '<平台key>' --style-code '<款式编码>' --output json
